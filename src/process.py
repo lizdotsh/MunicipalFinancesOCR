@@ -6,6 +6,7 @@ import pandas as pd
 import sys
 import logging
 import layoutparser as lp
+from google.cloud import vision
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("Process")
 import yaml
@@ -26,6 +27,12 @@ def convert_PDF(file, pagenum):
     pdf = np.asarray(pdf2image.convert_from_path(file)[pagenum])
     log.info("Converted page {} from {}".format(pagenum, file))   
     return pdf
+
+def GCV_cred(keypath = cfg['Model']['GCV_KEY']):
+    """
+    Specifies Google Cloud Vision Credentials. Defaults to keypath in config.yml
+    """
+    return lp.GCVAgent.with_credential(keypath,languages = ['en'])
 
 
 def load_det2_model(DET_MODEL_PATH = cfg['Model']['DET_MODEL_PATH'], LABEL_MAP = cfg['Model']['LABEL_MAP']):
