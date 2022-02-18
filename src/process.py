@@ -46,9 +46,10 @@ def to_pos_id(y_1 = float, y_2 = float, pagenum = int, docheight = 3850) -> floa
         y_2: Higher Y value of the selection 
         pagenum: Page number of the page where the selection came from 
         docheight: Height, in pixels, of the array of the document. Defaults to 3850, as that is dpi = 350 of the PDF
-    
     """
-    return float(pagenum) + (np.mean(y_1, y_2)/docheight)
+    pos_id = float(pagenum) + (np.mean(y_1, y_2)/docheight)
+    log.info("Log ID for page {} is {}".format(pagenum, pos_id))
+    return pos_id
 
 to_pos_id()
 #if __name__ == '__main__':
