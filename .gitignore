@@ -153,3 +153,4 @@ cython_debug/
 
 config.yml
 .DS_Store
+/Output

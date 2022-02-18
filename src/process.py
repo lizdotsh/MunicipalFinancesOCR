@@ -3,6 +3,7 @@
 import numpy as np 
 import pdf2image
 import pandas as pd
+import os
 import sys
 import logging
 import layoutparser as lp
@@ -32,8 +33,49 @@ def GCV_cred(keypath = cfg['Model']['GCV_KEY']):
     """
     Specifies Google Cloud Vision Credentials. Defaults to keypath in config.yml
     """
-    return lp.GCVAgent.with_credential(keypath,languages = ['en'])
+    x = lp.GCVAgent.with_credential(keypath,languages = ['en'])
+    log.info("Specified GCV Credentials")
+    return x
 
+def GCV_response(image, pagenum = int, docname = str, ocr_agent = None): 
+    """
+    This function takes an image and processes it on google cloud vision's OCR tool. If a docname and pagenum are specified, it saves them to /Output/docname/GCV_Res/pagenum-GCVres.json.
+
+    Arguments: 
+        image: ndarray for image to be processed
+
+        pagenum: pagenum the image is from. Is used to name file when saving. 
+
+        docname: Unique name for document. Use a different name for each, as it changes which folder it is saved in. 
+
+        ocr_agent: The ocr_agent variable you set. If not loaded, will use gcv_cred() defaults and load it again. 
+    """
+    # Tests if working directory exists for specified docname. 
+    save = True
+    if docname == None: 
+        save = False
+        log.error("Docname not specified. Will not save response")
+    if pagenum == None: 
+        save = False
+        log.error("Pagenumn not specified. Will not save response")
+
+    if ocr_agent == None: 
+        log.warning('GCV credentials not loaded, loading with GCV_Cred()')
+        ocr_agent = GCV_cred() 
+    if not os.path.exists('Output/{}/GCV_Res/'.format(docname)): 
+        os.makedirs('Output/{}/GCV_Res/'.format(docname))
+        log.warning("Directories not created for this project, created them.")
+    res = ocr_agent.detect(image, return_response = True)
+    log.info('GCV processed, saving')
+    if save == True:
+        ocr_agent.save_response(res,'Output/{}/GCV_Res/{}-GCVRes.json'.format(docname, str(pagenum)))
+        log.info('GCV Saved')
+    else: log.info('Could not save GCV')
+    return res
+
+
+    
+        
 
 def load_det2_model(DET_MODEL_PATH = cfg['Model']['DET_MODEL_PATH'], LABEL_MAP = cfg['Model']['LABEL_MAP']):
     """
@@ -111,6 +153,7 @@ def layout_excluding_layout(layout, filter_layout):
 if __name__ == '__main__':
     image = np.asarray(pdf2image.convert_from_path('/Users/liz/Documents/Projects/LayoutParser/test.pdf')[1])
     modeled_layout(image)
+    GCV_response(image,1, 'test')
 
     
 
