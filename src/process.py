@@ -86,6 +86,7 @@ def annotate_res(res, ocr_agent= None):
         ocr_agent: the ocr_agent, will load a new one if one is not specified with gcv_cred()
     
     Outputs: 
+        gcv_block: Block level layout file
         gcv_para: Paragraph level layout file
         gcv_word: Word level layout file
         gcv_char: Character level layout file
@@ -98,15 +99,16 @@ def annotate_res(res, ocr_agent= None):
         ocr_agent = gcv_cred()
         log.info('OCR agent loaded')
     else: log.info('OCR Agent Specified, continuing')
-
+    gcv_block = ocr_agent.gather_full_text_annotation(res, agg_level=lp.GCVFeatureType.BLOCK)
+    log.info('Created gcv_block')
     gcv_para = ocr_agent.gather_full_text_annotation(res, agg_level=lp.GCVFeatureType.PARA)
     log.info('Created gcv_para')
     gcv_word = ocr_agent.gather_full_text_annotation(res, agg_level=lp.GCVFeatureType.WORD)
     log.info('Created gcv_word') 
     gcv_char = ocr_agent.gather_full_text_annotation(res, agg_level=lp.GCVFeatureType.SYMBOL)
     log.info('Created gcv_word') 
-    if ocr == True: return gcv_para, gcv_word, gcv_char
-    else: return gcv_para, gcv_word, gcv_char, ocr_agent
+    if ocr == True: return gcv_block, gcv_para, gcv_word, gcv_char
+    else: return gcv_block, gcv_para, gcv_word, gcv_char, ocr_agent
 
 
         
@@ -186,9 +188,9 @@ def layout_excluding_layout(layout, filter_layout):
             
 if __name__ == '__main__':
     image = np.asarray(pdf2image.convert_from_path('/Users/liz/Documents/Projects/LayoutParser/test.pdf')[1])
-    modeled_layout(image)
+    table_layout = modeled_layout(image)
     res, ocr_agent = gcv_response(image,1, 'test')
-    gcv_para, gcv_word, gcv_char = annotate_res(res, ocr_agent)
+    gcv_block, gcv_para, gcv_word, gcv_char = annotate_res(res, ocr_agent)
 
     
 
