@@ -77,10 +77,19 @@ def gcv_response(image, pagenum = int, docname = str, ocr_agent = None):
     else: return res, ocr_agent
     
 
-def annotate_res(res, ocr_agent= None):#-> gcv_word, gcv_para, gcv_char):
+def annotate_res(res, ocr_agent= None): 
     """
-    Takes res file from GCV and splits it into layout files of two different aggregation levels. gcv_word is the word level, and gcv_para is the paragraph level. 
+    Takes res file from GCV and splits it into layout files of three different aggregation levels. gcv_para is the paragraph level, gcv_word is the word level, and gcv_char is the character level. 
 
+    Arguments: 
+        res: The response from google cloud, see gcv_response() for more details
+        ocr_agent: the ocr_agent, will load a new one if one is not specified with gcv_cred()
+    
+    Outputs: 
+        gcv_para: Paragraph level layout file
+        gcv_word: Word level layout file
+        gcv_char: Character level layout file
+        ocr_agent: Returns the ocr_agent variable if one was not specifed initially
     """
     ocr = True
     if ocr_agent == None: 
@@ -97,7 +106,7 @@ def annotate_res(res, ocr_agent= None):#-> gcv_word, gcv_para, gcv_char):
     gcv_char = ocr_agent.gather_full_text_annotation(res, agg_level=lp.GCVFeatureType.SYMBOL)
     log.info('Created gcv_word') 
     if ocr == True: return gcv_para, gcv_word, gcv_char
-    if ocr == False: return gcv_para, gcv_word, gcv_char
+    else: return gcv_para, gcv_word, gcv_char, ocr_agent
 
 
         
