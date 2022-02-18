@@ -1,0 +1,12 @@
+SOURCE_PDF: ''
+
+Model: 
+  DET_MODEL_PATH: 'lp://TableBank/faster_rcnn_R_101_FPN_3x/config' # Sets Model Path
+
+  # Sets "Label Map" used by model, see LayoutParser website for more information 
+  LABEL_MAP: {0: "Table"} 
+  
+  # Path to keyfile for Google Cloud Vision Authentication
+  GCV_KEY: 'path/to/keyfile'
+
+  
