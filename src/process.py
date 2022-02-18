@@ -28,11 +28,12 @@ def convert_PDF(file, pagenum):
     return pdf
 
 
-def load_det2_model(DET_MODEL_PATH, LABEL_MAP):
+def load_det2_model(DET_MODEL_PATH = cfg['Model']['DET_MODEL_PATH'], LABEL_MAP = cfg['Model']['LABEL_MAP']):
     """
     Loads the selected Delectron2 model
         DET_MODEL_PATH: Model path 
         LABEL_MAP: "Label Map" used by model, see LayoutParser website for more information 
+        Defaults to values in config.yml
     """
     model = lp.Detectron2LayoutModel(
         config_path = DET_MODEL_PATH, 
@@ -59,8 +60,7 @@ def to_pos_id(y_1 = float, y_2 = float, pagenum = int, docheight = 3850) -> floa
     log.info("Created Log ID {} for page {}".format(pos_id, pagenum))
     return pos_id
 
-to_pos_id()
-#if __name__ == '__main__':
+
 def layout_excluding_layout(layout, filter_layout):
     """
     This function takes a Layout variable and removes all units that fall inside another Layout file
@@ -73,4 +73,36 @@ def layout_excluding_layout(layout, filter_layout):
         if not any(b.is_in(b_tab) for b_tab in filter_layout)])
     log.info("Excluded filter_layout from the layout")
     return x
+
+#if __name__ == '__main__':
+   # model = load_det2_model()
+
+def modeled_layout(image, model = None, padding = cfg['Table']['Padding']):
+    """
+    Takes an image, and returns a Layout variable using the specified model. Then, it pads the model with specified padding. If model not specified, uses default model set by load_det2_model(). If padding not specified, uses padding set by config.yml. 
+
+    Arguments: 
+        image: ndarray, image to be used in model.detect()
+
+        model: Detectron2 model. Will default to reloading the model if unspecified. 
+
+        padding: dictionary of padding. needs to be in the form of a dictionary with 'left', 'right', 'top', and 'bottom' set to various integer values. Reccomended that you leave it default and set them with config.yml   
+    """
+    if model == None:
+        log.info("Model not specified, loading default from load_det2_model")
+        model = load_det2_model()
+    else: log.info("Model Specified, continuing")
+    try: 
+        layout = model.detect(image).pad(**padding)
+        log.info("Model ran on image")
+    except: 
+        log.info("An error occured when trying to run the model")
+           
+
+            
+if __name__ == '__main__':
+    image = np.asarray(pdf2image.convert_from_path('/Users/liz/Documents/Projects/LayoutParser/test.pdf')[1])
+    modeled_layout(image)
+
+    
 
