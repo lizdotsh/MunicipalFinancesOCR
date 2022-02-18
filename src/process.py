@@ -48,7 +48,7 @@ def to_pos_id(y_1 = float, y_2 = float, pagenum = int, docheight = 3850) -> floa
         docheight: Height, in pixels, of the array of the document. Defaults to 3850, as that is dpi = 350 of the PDF
     """
     pos_id = float(pagenum) + (np.mean(y_1, y_2)/docheight)
-    log.info("Log ID for page {} is {}".format(pagenum, pos_id))
+    log.info("Created Log ID {} for page {}".format(pos_id, pagenum))
     return pos_id
 
 to_pos_id()
