@@ -29,7 +29,7 @@ def convert_PDF(file, pagenum):
     log.info("Converted page {} from {}".format(pagenum, file))   
     return pdf
 
-def GCV_cred(keypath = cfg['Model']['GCV_KEY']):
+def gcv_cred(keypath = cfg['Model']['GCV_KEY']):
     """
     Specifies Google Cloud Vision Credentials. Defaults to keypath in config.yml
     """
@@ -37,7 +37,7 @@ def GCV_cred(keypath = cfg['Model']['GCV_KEY']):
     log.info("Specified GCV Credentials")
     return x
 
-def GCV_response(image, pagenum = int, docname = str, ocr_agent = None): 
+def gcv_response(image, pagenum = int, docname = str, ocr_agent = None): 
     """
     This function takes an image and processes it on google cloud vision's OCR tool. If a docname and pagenum are specified, it saves them to /Output/docname/GCV_Res/pagenum-GCVres.json.
 
@@ -52,6 +52,7 @@ def GCV_response(image, pagenum = int, docname = str, ocr_agent = None):
     """
     # Tests if working directory exists for specified docname. 
     save = True
+    ocr = True
     if docname == None: 
         save = False
         log.error("Docname not specified. Will not save response")
@@ -60,8 +61,9 @@ def GCV_response(image, pagenum = int, docname = str, ocr_agent = None):
         log.error("Pagenumn not specified. Will not save response")
 
     if ocr_agent == None: 
+        ocr = False
         log.warning('GCV credentials not loaded, loading with GCV_Cred()')
-        ocr_agent = GCV_cred() 
+        ocr_agent = gcv_cred() 
     if not os.path.exists('Output/{}/GCV_Res/'.format(docname)): 
         os.makedirs('Output/{}/GCV_Res/'.format(docname))
         log.warning("Directories not created for this project, created them.")
@@ -71,10 +73,33 @@ def GCV_response(image, pagenum = int, docname = str, ocr_agent = None):
         ocr_agent.save_response(res,'Output/{}/GCV_Res/{}-GCVRes.json'.format(docname, str(pagenum)))
         log.info('GCV Saved')
     else: log.info('Could not save GCV')
-    return res
-
-
+    if ocr == True: return res
+    else: return res, ocr_agent
     
+
+def annotate_res(res, ocr_agent= None):#-> gcv_word, gcv_para, gcv_char):
+    """
+    Takes res file from GCV and splits it into layout files of two different aggregation levels. gcv_word is the word level, and gcv_para is the paragraph level. 
+
+    """
+    ocr = True
+    if ocr_agent == None: 
+        ocr = False
+        log.warning('OCR agent not specified. Loading with GCV_cred()')
+        ocr_agent = gcv_cred()
+        log.info('OCR agent loaded')
+    else: log.info('OCR Agent Specified, continuing')
+
+    gcv_para = ocr_agent.gather_full_text_annotation(res, agg_level=lp.GCVFeatureType.PARA)
+    log.info('Created gcv_para')
+    gcv_word = ocr_agent.gather_full_text_annotation(res, agg_level=lp.GCVFeatureType.WORD)
+    log.info('Created gcv_word') 
+    gcv_char = ocr_agent.gather_full_text_annotation(res, agg_level=lp.GCVFeatureType.SYMBOL)
+    log.info('Created gcv_word') 
+    if ocr == True: return gcv_para, gcv_word, gcv_char
+    if ocr == False: return gcv_para, gcv_word, gcv_char
+
+
         
 
 def load_det2_model(DET_MODEL_PATH = cfg['Model']['DET_MODEL_PATH'], LABEL_MAP = cfg['Model']['LABEL_MAP']):
@@ -153,7 +178,8 @@ def layout_excluding_layout(layout, filter_layout):
 if __name__ == '__main__':
     image = np.asarray(pdf2image.convert_from_path('/Users/liz/Documents/Projects/LayoutParser/test.pdf')[1])
     modeled_layout(image)
-    GCV_response(image,1, 'test')
+    res, ocr_agent = gcv_response(image,1, 'test')
+    gcv_para, gcv_word, gcv_char = annotate_res(res, ocr_agent)
 
     
 
