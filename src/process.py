@@ -64,13 +64,13 @@ def gcv_response(image, pagenum = int, docname = str, ocr_agent = None):
         ocr = False
         log.warning('GCV credentials not loaded, loading with GCV_Cred()')
         ocr_agent = gcv_cred() 
-    if not os.path.exists('Output/{}/GCV_Res/'.format(docname)): 
-        os.makedirs('Output/{}/GCV_Res/'.format(docname))
+    if not os.path.exists('{}/{}/GCV_Res/'.format(cfg['OUTPUT_DIRECTORY'],docname)): 
+        os.makedirs('{}/{}/GCV_Res/'.format(cfg['OUTPUT_DIRECTORY'], docname))
         log.warning("Directories not created for this project, created them.")
     res = ocr_agent.detect(image, return_response = True)
     log.info('GCV processed, saving')
     if save == True:
-        ocr_agent.save_response(res,'Output/{}/GCV_Res/{}-GCVRes.json'.format(docname, str(pagenum)))
+        ocr_agent.save_response(res,'{}/{}/GCV_Res/{}-GCVRes.json'.format(cfg['OUTPUT_DIRECTORY'],docname, str(pagenum)))
         log.info('GCV Saved')
     else: log.info('Could not save GCV')
     if ocr == True: return res

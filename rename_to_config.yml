@@ -1,3 +1,4 @@
+OUTPUT_DIRECTORY: 'Output' #Do not include a / at the end of directory 
 SOURCE_PDF: ''
 
 Model: 
