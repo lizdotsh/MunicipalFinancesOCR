@@ -61,18 +61,7 @@ def to_pos_id(y_1 = float, y_2 = float, pagenum = int, docheight = 3850) -> floa
     return pos_id
 
 
-def layout_excluding_layout(layout, filter_layout):
-    """
-    This function takes a Layout variable and removes all units that fall inside another Layout file
-    Arguments: 
-        layout: The source layout. In this case, the text layout. 
-        filter_layout: The layout that the filter checks against. Everything from layout that lies within a unit of filter_layout will be removed by this function. 
-        padding: automatic function to add padding 
-    """
-    x = lp.Layout([b for b in layout \
-        if not any(b.is_in(b_tab) for b_tab in filter_layout)])
-    log.info("Excluded filter_layout from the layout")
-    return x
+
 
 #if __name__ == '__main__':
    # model = load_det2_model()
@@ -95,10 +84,22 @@ def modeled_layout(image, model = None, padding = cfg['Table']['Padding']):
     try: 
         layout = model.detect(image).pad(**padding)
         log.info("Model ran on image")
+        return layout
     except: 
         log.info("An error occured when trying to run the model")
            
-
+def layout_excluding_layout(layout, filter_layout):
+    """
+    This function takes a Layout variable and removes all units that fall inside another Layout file
+    Arguments: 
+        layout: The source layout. In this case, the text layout. 
+        filter_layout: The layout that the filter checks against. Everything from layout that lies within a unit of filter_layout will be removed by this function. 
+        padding: automatic function to add padding 
+    """
+    x = lp.Layout([b for b in layout \
+        if not any(b.is_in(b_tab) for b_tab in filter_layout)])
+    log.info("Excluded filter_layout from the layout")
+    return x
             
 if __name__ == '__main__':
     image = np.asarray(pdf2image.convert_from_path('/Users/liz/Documents/Projects/LayoutParser/test.pdf')[1])
