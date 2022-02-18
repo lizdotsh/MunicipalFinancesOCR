@@ -29,4 +29,5 @@ def LoadDet2Model(DET_MODEL_PATH, LABEL_MAP):
     model = lp.Detectron2LayoutModel(
         config_path = DET_MODEL_PATH, 
         label_map = LABEL_MAP)
+    log.info('Loaded Detectron2 model with LayoutParser')
     return model
