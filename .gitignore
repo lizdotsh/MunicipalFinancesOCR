@@ -153,4 +153,5 @@ cython_debug/
 
 config.yml
 .DS_Store
-/Output
+Output/*
+!Output/desc.txt

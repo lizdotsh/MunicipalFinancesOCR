@@ -1,0 +1,1 @@
+This folder is used to store outputs of other functions. The root directory of this folder is named in accordance with the various document names. Subfolders inside that will include the various outputs from various stages of the process. Intermediate files are kept in place, as they shouldn't be especially large and it is good practice for anything research related. 
