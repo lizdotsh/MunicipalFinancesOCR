@@ -2,11 +2,19 @@
 # input images into tabular form
 import numpy as np 
 import pdf2image
+import pandas as pd
 import sys
 import logging
 import layoutparser as lp
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("Process")
+import yaml
+with open('/Users/liz/Documents/Projects/MunicipalFinancesOCR/config.yml') as f:
+    try:
+        cfg = yaml.load(f, Loader=yaml.SafeLoader)
+        print(dict)
+    except yaml.YAMLError as e:
+        print(e)
 
 
 def convert_PDF(file, pagenum):
@@ -53,4 +61,16 @@ def to_pos_id(y_1 = float, y_2 = float, pagenum = int, docheight = 3850) -> floa
 
 to_pos_id()
 #if __name__ == '__main__':
+def layout_excluding_layout(layout, filter_layout):
+    """
+    This function takes a Layout variable and removes all units that fall inside another Layout file
+    Arguments: 
+        layout: The source layout. In this case, the text layout. 
+        filter_layout: The layout that the filter checks against. Everything from layout that lies within a unit of filter_layout will be removed by this function. 
+        padding: automatic function to add padding 
+    """
+    x = lp.Layout([b for b in layout \
+        if not any(b.is_in(b_tab) for b_tab in filter_layout)])
+    log.info("Excluded filter_layout from the layout")
+    return x
 
