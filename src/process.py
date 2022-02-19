@@ -11,7 +11,7 @@ from google.cloud import vision
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("Process")
 import yaml
-with open('/Users/liz/Documents/Projects/MunicipalFinancesOCR/config.yml') as f:
+with open('config.yml') as f:
     try:
         cfg = yaml.load(f, Loader=yaml.SafeLoader)
         print(dict)
