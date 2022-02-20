@@ -37,8 +37,21 @@ def gcv_cred(keypath = cfg['Model']['GCV_KEY']):
     x = lp.GCVAgent.with_credential(keypath,languages = ['en'])
     log.info("Specified GCV Credentials")
     return x
+def gcv_res_exists(pagenum = None, docname = cfg['SOURCE_NAME'], OUTPUT_DIRECTORY = cfg['OUTPUT_DIRECTORY']):
+    """
+    Checks to see if image has already been processed with google cloud
+    """
+    if pagenum == None: return False 
+    if(os.path.isfile('{}/{}/GCV_Res/{}-GCVRes.json'.format(OUTPUT_DIRECTORY, docname, pagenum))): return True 
 
-def gcv_response(image, pagenum = int, docname = str, ocr_agent = None): 
+def gcv_upload(image, ocr_agent = None): 
+    """Sends image to GCV for detection. Typically used only by gcv_response, as gcv_response checks if this has already been done."""
+    res = ocr_agent.detect(image, return_response = True)
+    log.info('GCV processed/uploaded')
+    return res, ocr_agent 
+
+ 
+def gcv_response(image, pagenum = None, docname = cfg['SOURCE_NAME'], OUTPUT_DIRECTORY = cfg['OUTPUT_DIRECTORY'], ocr_agent = None): 
     """
     This function takes an image and processes it on google cloud vision's OCR tool. If a docname and pagenum are specified, it saves them to /Output/docname/GCV_Res/pagenum-GCVres.json.
 
@@ -51,32 +64,29 @@ def gcv_response(image, pagenum = int, docname = str, ocr_agent = None):
 
         ocr_agent: The ocr_agent variable you set. If not loaded, will use gcv_cred() defaults and load it again. 
     """
-    # Tests if working directory exists for specified docname. 
-    save = True
+    # Tests if working directory exists for specified docname.  
     ocr = True
-    if docname == None: 
-        save = False
-        log.error("Docname not specified. Will not save response")
-    if pagenum == None: 
-        save = False
-        log.error("Pagenumn not specified. Will not save response")
-
     if ocr_agent == None: 
         ocr = False
         log.warning('GCV credentials not loaded, loading with GCV_Cred()')
         ocr_agent = gcv_cred() 
-    if not os.path.exists('{}/{}/GCV_Res/'.format(cfg['OUTPUT_DIRECTORY'],docname)): 
-        os.makedirs('{}/{}/GCV_Res/'.format(cfg['OUTPUT_DIRECTORY'], docname))
-        log.warning("Directories not created for this project, created them.")
-    res = ocr_agent.detect(image, return_response = True)
-    log.info('GCV processed, saving')
-    if save == True:
-        ocr_agent.save_response(res,'{}/{}/GCV_Res/{}-GCVRes.json'.format(cfg['OUTPUT_DIRECTORY'],docname, str(pagenum)))
-        log.info('GCV Saved')
-    else: log.info('Could not save GCV')
+    if pagenum == None:
+        log.error("Pagenum not specified. Will not save response")
+        res, ocr_agent = gcv_upload(image, ocr_agent=ocr_agent)
+    else: 
+        if gcv_res_exists(pagenum=pagenum, docname = docname, OUTPUT_DIRECTORY=OUTPUT_DIRECTORY): 
+            log.info('GCV Already Processed, loading from file')
+            res = ocr_agent.load_response('{}/{}/GCV_Res/{}-GCVRes.json'.format(OUTPUT_DIRECTORY, docname, pagenum))
+        else:
+            res, ocr_agent = gcv_upload(image, ocr_agent=ocr_agent) 
+            if not os.path.exists('{}/{}/GCV_Res/'.format(OUTPUT_DIRECTORY,docname)): 
+                os.makedirs('{}/{}/GCV_Res/'.format(OUTPUT_DIRECTORY, docname))
+                log.warning("Directories not created for this project, created them.") 
+            ocr_agent.save_response(res,'{}/{}/GCV_Res/{}-GCVRes.json'.format(OUTPUT_DIRECTORY,docname, str(pagenum)))
+            log.info('GCV Saved')          
     if ocr == True: return res
     else: return res, ocr_agent
-    
+   
 
 def annotate_res(res, ocr_agent= None): 
     """
