@@ -8,6 +8,7 @@ import sys
 import logging
 import layoutparser as lp
 from google.cloud import vision
+from pyparsing import col
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("Process")
 import yaml
@@ -185,12 +186,65 @@ def layout_excluding_layout(layout, filter_layout):
         if not any(b.is_in(b_tab) for b_tab in filter_layout)])
     log.info("Excluded filter_layout from the layout")
     return x
-            
+
+
+def text_layout_from_selection(text_layer, bounding_layer):
+    """Returns text from selected boundary layer"""
+    return text_layer.filter_by(bounding_layer)
+
+def list_text_layout_from_selection(text_layer, bounding_layers):
+    """Inputs a text layer a Layer of several bounding layers. It returns the text from each individual bounding polygon using text_from_selection() and returns them in list form."""
+    l = []
+    for i,x in enumerate(bounding_layers): 
+        z = text_layout_from_selection(text_layer, x)
+        log.info('Converted bounding layer {}'.format(i))
+    return z
+
+def remove_titles(bounding_layers, cfgtable = cfg['Table']):
+    px = cfgtable['titlerow_px'] + cfgtable['Padding']['top']
+    return bounding_layers.pad(top=-px)
+
+def to_polygons(bounding_layer):
+    """Converts Layer object into a simpler polygon"""
+    return bounding_layer.get_homogeneous_blocks()
+
+def create_bounding_polygons(bounding_poly = lp.elements.layout_elements.TextBlock, column_dict = cfg['Table']):
+    """
+    Creates a list of bounding polygons for a table given a polygon for the table. Specifications need to be given in config.yml
+
+    Arguments: 
+        bounding_poly: Must be a SINGULAR text block rectangle. This means if you just passed a layer file through to_polygons(), you must feed the function a specific polyon in that list. Ex: table_poly[0]
+        column_dict: You can specify a different dictionary specifying the columns if you want. Check config.yml for template. 
+    """
+    bounding_coords = bounding_poly.coordinates
+    bounding_width = bounding_poly.width
+    col_widths_frac = []
+    for i in column_dict["columns"]:
+        col_widths_frac.append(column_dict["columns"][i]["width"]) # Gather a list of all the widths in config.yml
+    col_widths_px = []
+    for x in col_widths_frac:
+        col_widths_px.append(x * bounding_width) # Convert those widths into pixel values based on bounding_layer 
+    current_pos = bounding_coords[0]
+    polygons = []
+    for _ in col_widths_px:
+        x = current_pos + _
+        polygons.append(
+            lp.Rectangle(
+                x_1 = current_pos,
+                y_1 = bounding_coords[1],
+                x_2 = x,
+                y_2 = bounding_coords[3],
+            )
+        )
+        current_pos = x
+    return polygons
+
+
 if __name__ == '__main__':
     image = np.asarray(pdf2image.convert_from_path('/Users/liz/Documents/Projects/LayoutParser/test.pdf')[1])
     table_layout = modeled_layout(image)
     res, ocr_agent = gcv_response(image,1, 'test')
     gcv_block, gcv_para, gcv_word, gcv_char = annotate_res(res, ocr_agent)
-
-    
+    table_poly = to_polygons(table_layout)
+   
 

@@ -18,3 +18,12 @@ Table:
     right: 20
     top: 80
     bottom: 10
+    
+  titlerow_px: 50 # Number of pixels the title row takes up. 
+  column_num: 8 # Number of columns 
+  columns: # List all columns below, following template 
+    title_of_bond:
+      width: # Width, in decimal form as a fraction of 1  
+      soft_margin: # The 'soft_margin' argument passed into Laytout_filter_by(), in pixels
+        left: 5
+        right: 5
