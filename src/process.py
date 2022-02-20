@@ -26,7 +26,7 @@ def convert_PDF(file, pagenum):
         file: The file path of the PDF
         pagenum: the page number of the PDF to convert
     """
-    pdf = np.asarray(pdf2image.convert_from_path(file)[pagenum])
+    pdf = np.asarray(pdf2image.convert_from_path(file, dpi=250, first_page=pagenum, last_page=pagenum)[0])
     log.info("Converted page {} from {}".format(pagenum, file))   
     return pdf
 
@@ -146,13 +146,50 @@ def to_pos_id(y_1 = float, y_2 = float, pagenum = int, docheight = 3850) -> floa
     log.info("Created Log ID {} for page {}".format(pos_id, pagenum))
     return pos_id
 
-
+def save_det2_model(layout, pagenum = int, OUTPUT_DIRECTORY = cfg['OUTPUT_DIRECTORY'], docname = cfg['SOURCE_NAME']):
+    if pagenum == None: 
+        log.error('No pagenum specified')
+    else: 
+        df = layout.to_dataframe()
+        df['pagenum'] = pagenum
+        df['id'] = df.index
+        log.info('Page {} converted to dataframe'.format(pagenum))
+        if not os.path.exists('{}/{}/TableBank_model/'.format(OUTPUT_DIRECTORY,docname)): 
+            os.makedirs('{}/{}/TableBank_model/'.format(OUTPUT_DIRECTORY, docname))
+            log.warning("Directories not created for this project, created them.")
+        if(os.path.isfile('{}/{}/TableBank_model/{}.csv'.format(OUTPUT_DIRECTORY, docname, docname))):
+            log.info('csv exists, writing')
+            df.to_csv('{}/{}/TableBank_model/{}.csv'.format(OUTPUT_DIRECTORY, docname, docname), mode='a', index= False,header=False)
+            log.info('csv has been amended for page {} of {}'.format(pagenum, docname))
+        else:
+            log.warning('csv for {} does not exist, creating'.format(pagenum))
+            df.to_csv('{}/{}/TableBank_model/{}.csv'.format(OUTPUT_DIRECTORY, docname, docname), index= False)
+            log.info('csv created, model saved')
 
 
 #if __name__ == '__main__':
    # model = load_det2_model()
+def already_in_csv(pagenum, OUTPUT_DIRECTORY = cfg['OUTPUT_DIRECTORY'], docname = cfg['SOURCE_NAME']):
+    """Tests if model layout has been amended to csv"""
+    if not os.path.exists('{}/{}/TableBank_model/'.format(OUTPUT_DIRECTORY,docname)): return False
+    df = pd.read_csv('{}/{}/TableBank_model/{}.csv'.format(OUTPUT_DIRECTORY, docname, docname))
+    if df['pagenum'].eq(pagenum).any(): 
+        return True
+    else: 
+        return False
+def load_det2_csv(pagenum, OUTPUT_DIRECTORY = cfg['OUTPUT_DIRECTORY'], docname = cfg['SOURCE_NAME']): 
+    """Loads det2 layout from csv"""
+    if(os.path.isfile('{}/{}/TableBank_model/{}.csv'.format(OUTPUT_DIRECTORY, docname, docname))):
+        log.info('csv exists')
+        df = pd.read_csv('{}/{}/TableBank_model/{}.csv'.format(OUTPUT_DIRECTORY, docname, docname))
+        df = df[df['pagenum'] == pagenum]
+        layout = lp.io.load_dataframe(df)
+        return layout
+    else: 
+        log.error('CSV Doesnt exist')
+    
 
-def modeled_layout(image, model = None, padding = cfg['Table']['Padding']):
+def modeled_layout(image, pagenum = None, model = None, padding = cfg['Table']['Padding'], save = True, OUTPUT_DIRECTORY = cfg['OUTPUT_DIRECTORY'], docname = cfg['SOURCE_NAME']):
     """
     Takes an image, and returns a Layout variable using the specified model. Then, it pads the model with specified padding. If model not specified, uses default model set by load_det2_model(). If padding not specified, uses padding set by config.yml. 
 
@@ -163,16 +200,28 @@ def modeled_layout(image, model = None, padding = cfg['Table']['Padding']):
 
         padding: dictionary of padding. needs to be in the form of a dictionary with 'left', 'right', 'top', and 'bottom' set to various integer values. Reccomended that you leave it default and set them with config.yml   
     """
-    if model == None:
-        log.info("Model not specified, loading default from load_det2_model")
-        model = load_det2_model()
-    else: log.info("Model Specified, continuing")
-    try: 
+
+    if already_in_csv(pagenum, OUTPUT_DIRECTORY = OUTPUT_DIRECTORY, docname=docname): 
+        log.info('Already loaded this model, loading from CSV')
+        return load_det2_csv(pagenum, OUTPUT_DIRECTORY=OUTPUT_DIRECTORY, docname = docname)
+    else: 
+        if model == None:
+            log.info("Model not specified, loading default from load_det2_model")
+            model = load_det2_model()
+        else: 
+            log.info("Model Specified, continuing") 
         layout = model.detect(image).pad(**padding)
         log.info("Model ran on image")
-        return layout
-    except: 
-        log.info("An error occured when trying to run the model")
+        if save == True:
+            if pagenum == None:
+                log.error('No Pagenum Specified, cannot save')
+                return layout
+            else:  
+                save_det2_model(layout, pagenum=pagenum, OUTPUT_DIRECTORY=OUTPUT_DIRECTORY, docname=docname)
+                return layout
+        else:
+            return layout
+   
            
 def layout_excluding_layout(layout, filter_layout):
     """
@@ -240,7 +289,7 @@ def create_bounding_polygons(bounding_poly = lp.elements.layout_elements.TextBlo
     return polygons
 
 
-if __name__ == '__main__':
+def main():
     image = np.asarray(pdf2image.convert_from_path('/Users/liz/Documents/Projects/LayoutParser/test.pdf')[1])
     table_layout = modeled_layout(image)
     res, ocr_agent = gcv_response(image,1, 'test')
@@ -248,7 +297,12 @@ if __name__ == '__main__':
     table_poly = to_polygons(table_layout)
     #testing create polygons
     ll = create_bounding_polygons(remove_titles(table_poly[1]))
-    hi = gcv_para.filter_by(ll[0], soft_margin = {"left":10, "right":10})
-    lp.draw_box(image, hi, box_width=4).save("Tests/bruh.png", "PNG")
+    hi = gcv_word.filter_by(ll[0], soft_margin = {"left":10, "right":10})
+    lp.draw_box(image, ll, box_width=4).save("Tests/bruh3.png", "PNG")
+    lp.draw_box(image, hi, box_width=4).save("Tests/bruh4.png", "PNG") 
+if __name__ == '__main__':
+    log.info('for debug only')
+    #main()
+
    
 
