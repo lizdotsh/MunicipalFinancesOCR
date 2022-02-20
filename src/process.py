@@ -246,5 +246,9 @@ if __name__ == '__main__':
     res, ocr_agent = gcv_response(image,1, 'test')
     gcv_block, gcv_para, gcv_word, gcv_char = annotate_res(res, ocr_agent)
     table_poly = to_polygons(table_layout)
+    #testing create polygons
+    ll = create_bounding_polygons(remove_titles(table_poly[1]))
+    hi = gcv_para.filter_by(ll[0], soft_margin = {"left":10, "right":10})
+    lp.draw_box(image, hi, box_width=4).save("Tests/bruh.png", "PNG")
    
 
