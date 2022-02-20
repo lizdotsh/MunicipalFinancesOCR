@@ -1,5 +1,7 @@
-OUTPUT_DIRECTORY: 'Output' #Do not include a / at the end of directory 
-SOURCE_PDF: ''
+INPUT_DIRECTORY: 'Input' # Do not include a / at the end of directory 
+OUTPUT_DIRECTORY: 'Output' # Do not include a / at the end of directory 
+SOURCE_PDF: 'moodys_1920.pdf'
+SOURCE_NAME: 'moodys_1920' # Name used to identify pdf. Will be used to name folders. 
 
 Model: 
   DET_MODEL_PATH: 'lp://TableBank/faster_rcnn_R_101_FPN_3x/config' # Sets Model Path
