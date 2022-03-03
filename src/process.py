@@ -178,7 +178,7 @@ def save_det2_model(layout, pagenum = int, OUTPUT_DIRECTORY = cfg['OUTPUT_DIRECT
             log.info('csv created, model saved')
 
 
-#if __name__ == '__main__':
+ #if __name__ == '__main__':
    # model = load_det2_model()
 def already_in_csv(pagenum, OUTPUT_DIRECTORY = cfg['OUTPUT_DIRECTORY'], docname = cfg['SOURCE_NAME']):
     """Tests if model layout has been amended to csv"""
@@ -188,7 +188,7 @@ def already_in_csv(pagenum, OUTPUT_DIRECTORY = cfg['OUTPUT_DIRECTORY'], docname 
         return True
     else: 
         return False
-def load_det2_csv(pagenum, OUTPUT_DIRECTORY = cfg['OUTPUT_DIRECTORY'], docname = cfg['SOURCE_NAME']): 
+def load_det2_csv(pagenum, OUTPUT_DIRECTORY = cfg["OUTPUT_DIRECTORY"], docname = cfg['SOURCE_NAME']): 
     """Loads det2 layout from csv"""
     if(os.path.isfile('{}/{}/TableBank_model/{}.csv'.format(OUTPUT_DIRECTORY, docname, docname))):
         log.info('csv exists')
@@ -198,7 +198,7 @@ def load_det2_csv(pagenum, OUTPUT_DIRECTORY = cfg['OUTPUT_DIRECTORY'], docname =
         return layout
     else: 
         log.error('CSV Doesnt exist')
-    
+   
 
 def modeled_layout(image, pagenum = None, model = None, padding = cfg['Table']['Padding'], save = True, OUTPUT_DIRECTORY = cfg['OUTPUT_DIRECTORY'], docname = cfg['SOURCE_NAME']):
     """
@@ -244,7 +244,7 @@ def layout_excluding_layout(layout, filter_layout):
     """
     x = lp.Layout([b for b in layout \
         if not any(b.is_in(b_tab) for b_tab in filter_layout)])
-    log.info("Excluded filter_layout from the layout")
+    log.info("excluded filter_layout from the layout")
     return x
 
 
@@ -280,22 +280,60 @@ def to_polygons(bounding_layer):
 def cols_px(bounding, cfgtable = cfg['Table']):
     """
     uses settings in config.yml to determine the location of each column based on the location of the column titles. 
-    REMINDER: ADD MORE DOCUMENTATION 
+    
     """
-    df = bounding.to_dataframe()
-    df['y_1'] = [i[1] for i in df['points']]
-    df['y_2'] = [i[7] for i in df['points']]
-    df['y_avg'] = (df['y_1'] + df['y_2'])/2
-    namedf = pd.DataFrame(columns=['y_1', 'y_2', 'ColNum'])
+    df = bounding.to_dataframe() # Turns into dataframe
+    df['x_1'] = [i[0] for i in df['points']] # separates coordinates 
+    df['x_2'] = [i[2] for i in df['points']]
+    df['x_avg'] = (df['x_1'] + df['x_2'])/2
+    namedf = pd.DataFrame(columns=['ColNum', 'x_avg'])
     for x,i in enumerate(cfgtable['columns']):
         for _ in df['text']:
             if bool(re.search(str(cfgtable['columns'][i]['regex']), _.lower())): 
-                df1 = df[df['text'] == _][['y_1', 'y_2']]
+                df1 = df[df['text'] == _][['x_avg']]
                 df1['ColNum'] = x
                 namedf = namedf.append(df1)
                 log.info('Appended column {}'.format(x))
        # re.search([i]['regex'])
-    return namedf 
+    return namedf.reset_index(drop=True)
+
+def column_poly(table_text_poly, cols_px_df, gcv_word, cfgtable = cfg['Table']):
+    """
+    Takes column positions in the form of a dataframe from cols_px() returns polygons for each section. 
+        
+        Arguments: 
+        table_text_poly: The source polygon. if a layerfile, make sure to set [i] on the end to get a specific table. 
+        cols_px_df: df given by cols_px
+        cfgtable: config file's table section, will work automatically by default
+    Other important information: 
+
+        - Each column will have a "special" section. at the moment you should only really have that set on the first column, as I am using it for dynamic sizing for
+        the first column only and it is kinda hardcoded at the moment. special gap sets the gap. check the comments on the code of the function for more information. 
+    """
+    coords = table_text_poly.coordinates # gets coordinates of the bounding layer
+    layouts = []
+    for i,x in enumerate(cfgtable['columns']):
+             rec = lp.Rectangle(
+                x_1 = (cols_px_df['x_avg'][i] - cfgtable['columns'][x]['hard_margin']['left']),
+                y_1 = coords[1],
+                x_2 = (cols_px_df['x_avg'][i] + cfgtable['columns'][x]['hard_margin']['right']),
+                y_2 = coords[3])
+             layouts.append(rec)     
+             if cfgtable['columns'][x]['special'] == True: 
+                 spl = x
+    tb = layouts[0].coordinates # checks coordinates of title_of_bond and stores them 
+    ri = layouts[1].coordinates # checks coordinates for the second row, as it will use the second row to dynamically assign the first row
+    layouts[0] = lp.Rectangle(
+        # This whole section just sets the first row's x_2 to the x_1 of the second row, minus a special_gap
+        x_1 = tb[0],
+        y_1 = tb[1],
+        x_2 = ( ri[0] - cfgtable['columns'][spl]['special_gap']),
+        y_2 = tb[3]
+    )
+    return layouts
+
+def identify_rows(): 
+    pass
 
 def create_bounding_polygons(bounding_poly = lp.elements.layout_elements.TextBlock, column_dict = cfg['Table']):
     """
@@ -323,7 +361,7 @@ def create_bounding_polygons(bounding_poly = lp.elements.layout_elements.TextBlo
                 x_1 = current_pos,
                 y_1 = bounding_coords[1],
                 x_2 = x,
-                y_2 = bounding_coords[3],
+                y_2 = bounding_coords[3]
             )
         )
         current_pos = x
@@ -343,11 +381,19 @@ if __name__ == '__main__':
     gcv_block, gcv_para, gcv_word, gcv_char = annotate_res(res, ocr_agent)
     table_poly = to_polygons(table_layout)
     #testing create polygons
-    ll = create_bounding_polygons(remove_titles(table_poly[1]))
-    hi = gcv_word.filter_by(ll[0], soft_margin = {"left":10, "right":10})
-    lp.draw_box(image, ll, box_width=4).save("Tests/bruh3.png", "PNG")
-    lp.draw_box(image, hi, box_width=4).save("Tests/bruh4.png", "PNG") 
+   # ll = create_bounding_polygons(remove_titles(table_poly[1]))
+   # hi = gcv_word.filter_by(ll[0], soft_margin = {"left":10, "right":10})
+   # lp.draw_box(image, ll, box_width=4).save("Tests/bruh3.png", "PNG")
+   # lp.draw_box(image, hi, box_width=4).save("Tests/bruh4.png", "PNG") 
     table_title_1 = isolate_titles(table_poly[0])
     tabletitletext = text_layout_from_selection(gcv_word, table_title_1)
-   
+    # %%
+    px = cols_px(tabletitletext)
+    a = column_poly(table_poly[0], px, gcv_word)
+    lp.draw_box(image, a, box_width=4).save("Tests/21.png", "PNG")
+
+
+
+# %%
+
 
