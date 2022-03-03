@@ -6,6 +6,7 @@ import pandas as pd
 import os
 import sys
 import logging
+import re
 import layoutparser as lp
 from google.cloud import vision
 from pyparsing import col
@@ -263,9 +264,38 @@ def remove_titles(bounding_layers, cfgtable = cfg['Table']):
     px = cfgtable['titlerow_px'] + cfgtable['Padding']['top']
     return bounding_layers.pad(top=-px)
 
+def isolate_titles(bounding_poly, cfgtable = cfg['Table']):
+    """Takes padded bounding polygon of table, removes padding, and then removes all put the pixels set in titlerow_px to isolate the title row"""
+    no_toptitle = bounding_poly.pad(top = -cfgtable['Padding']['top'])
+    height = no_toptitle.height
+    px = height - cfgtable['titlerow_px'] 
+    isolated = no_toptitle.pad(bottom=-px)
+    log.info('isolated title')
+    return isolated
+
 def to_polygons(bounding_layer):
     """Converts Layer object into a simpler polygon"""
     return bounding_layer.get_homogeneous_blocks()
+
+def cols_px(bounding, cfgtable = cfg['Table']):
+    """
+    uses settings in config.yml to determine the location of each column based on the location of the column titles. 
+    REMINDER: ADD MORE DOCUMENTATION 
+    """
+    df = bounding.to_dataframe()
+    df['y_1'] = [i[1] for i in df['points']]
+    df['y_2'] = [i[7] for i in df['points']]
+    df['y_avg'] = (df['y_1'] + df['y_2'])/2
+    namedf = pd.DataFrame(columns=['y_1', 'y_2', 'ColNum'])
+    for x,i in enumerate(cfgtable['columns']):
+        for _ in df['text']:
+            if bool(re.search(str(cfgtable['columns'][i]['regex']), _.lower())): 
+                df1 = df[df['text'] == _][['y_1', 'y_2']]
+                df1['ColNum'] = x
+                namedf = namedf.append(df1)
+                log.info('Appended column {}'.format(x))
+       # re.search([i]['regex'])
+    return namedf 
 
 def create_bounding_polygons(bounding_poly = lp.elements.layout_elements.TextBlock, column_dict = cfg['Table']):
     """
@@ -275,6 +305,7 @@ def create_bounding_polygons(bounding_poly = lp.elements.layout_elements.TextBlo
         bounding_poly: Must be a SINGULAR text block rectangle. This means if you just passed a layer file through to_polygons(), you must feed the function a specific polyon in that list. Ex: table_poly[0]
         column_dict: You can specify a different dictionary specifying the columns if you want. Check config.yml for template. 
     """
+    
     bounding_coords = bounding_poly.coordinates
     bounding_width = bounding_poly.width
     col_widths_frac = []
@@ -299,7 +330,13 @@ def create_bounding_polygons(bounding_poly = lp.elements.layout_elements.TextBlo
     return polygons
 
 
-def main():
+    
+
+#def main():
+    
+if __name__ == '__main__':
+    log.info('for debug only')
+    #main()
     image = np.asarray(pdf2image.convert_from_path('/Users/liz/Documents/Projects/LayoutParser/test.pdf')[1])
     table_layout = modeled_layout(image)
     res, ocr_agent = gcv_response(image,1, 'test')
@@ -310,9 +347,7 @@ def main():
     hi = gcv_word.filter_by(ll[0], soft_margin = {"left":10, "right":10})
     lp.draw_box(image, ll, box_width=4).save("Tests/bruh3.png", "PNG")
     lp.draw_box(image, hi, box_width=4).save("Tests/bruh4.png", "PNG") 
-if __name__ == '__main__':
-    log.info('for debug only')
-    #main()
-
+    table_title_1 = isolate_titles(table_poly[0])
+    tabletitletext = text_layout_from_selection(gcv_word, table_title_1)
    
 
