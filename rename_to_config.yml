@@ -26,6 +26,14 @@ Table:
     right: 10
     top: 10
     bottom: 10
+  cont: # Section for detecting if you need to test for the tables being split, searches for  regex
+    search: true
+    regex: 'continued' 
+    cont_soft_margin:
+      left: 10
+      right: 10
+      top: 40
+      bottom: 10
   distance_th: 5
   columns: # List all columns below, following template 
     title_of_bond:
