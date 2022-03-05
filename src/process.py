@@ -349,7 +349,7 @@ def txt_from_col_poly(col_poly, gcv_word, cfgtable = cfg['Table']):
         filtered = gcv_word.filter_by(
             col_poly[i], 
             soft_margin = cfgtable['columns'][x]['soft_margin']
-        )
+        , center = True)
         cols.append(filtered)
     return cols
 
@@ -428,8 +428,22 @@ def create_bounding_polygons(bounding_poly = lp.elements.layout_elements.TextBlo
         current_pos = x
     return polygons
 
-   
-
+def parse_table(table_layout, gcv_word, tablenum, distance_th, cfgtable = cfg['Table']): 
+    """
+    combines many functions into one. Essentially all you need is the table layout, gcv_word, 
+    and tablenum and it will return you a dataframe of all of the text within each table
+    """
+    table_poly = to_polygons(table_layout) # Convert to polygon 
+    tabletitletext = gcv_word.filter_by(
+       isolate_titles(table_poly[tablenum], cfgtable),
+       soft_margin = cfgtable['title_soft_margin'] 
+    )
+    px = cols_px(tabletitletext) # location of each column
+    table_titleless = remove_titles(table_poly[tablenum], cfgtable) # returns poly for specified tablenum but without 
+    col_poly = column_poly(table_titleless, px, gcv_word, cfgtable)
+    double_layered = identify_rows(col_poly, distance_th, gcv_word, cfgtable)
+    return layer_to_df(double_layered)
+    
 #def main():
     
 if __name__ == '__main__':
