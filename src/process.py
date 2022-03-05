@@ -264,6 +264,14 @@ def remove_titles(bounding_layers, cfgtable = cfg['Table']):
     px = cfgtable['titlerow_px'] + cfgtable['Padding']['top']
     return bounding_layers.pad(top=-px)
 
+def remove_many_titles(table_poly):
+    l = []
+    for i in table_poly:
+        _ = remove_titles(i)
+        l.append(_)
+    return l
+
+ 
 def isolate_titles(bounding_poly, cfgtable = cfg['Table']):
     """Takes padded bounding polygon of table, removes padding, and then removes all put the pixels set in titlerow_px to isolate the title row"""
     no_toptitle = bounding_poly.pad(top = -cfgtable['Padding']['top'])
@@ -332,11 +340,64 @@ def column_poly(table_text_poly, cols_px_df, gcv_word, cfgtable = cfg['Table']):
     )
     return layouts
 
-def identify_rows(): 
-    pass
+def txt_from_col_poly(col_poly, gcv_word, cfgtable = cfg['Table']): 
+    """
+    Takes the output from identify_rows and puts everything in a nice data frame. 
+    """
+    cols = []
+    for i,x in enumerate(cfgtable['columns']):
+        filtered = gcv_word.filter_by(
+            col_poly[i], 
+            soft_margin = cfgtable['columns'][x]['soft_margin']
+        )
+        cols.append(filtered)
+    return cols
+
+
+def identify_rows(col_txt_list, distance_th, gcv_word, cfgtable = cfg['Table']): 
+    """
+    used to dynamically calculate rows based on distances between the x values of various things. 
+    col_text_list must be a list of polygons defining the various different columns, and must not have a title in it. 
+    distance_th is the distance between the center of the polygons 
+    gcv_word is google cloud word thing 
+    returns list of list, first subsetting is by col second is by row. 
+    """
+    list = []
+    #df = pd.DataFrame()
+    blocks = txt_from_col_poly(col_txt_list, gcv_word, cfgtable)
+    o = 0
+    for i in blocks: 
+        i = sorted(i, key = lambda x: x.coordinates[1]) # Sort the blocks vertically from top to bottom
+        distances = np.array([((b2.coordinates[1] + b2.coordinates[3])/2) - ((b1.coordinates[3] + b1.coordinates[1])/2) for (b1, b2) in zip(i, i[1:])])
+        # Calculate the distances:
+        # y coord for the upper edge of the bottom block -
+        #   y coord for the bottom edge of the upper block
+        # And convert to np array for easier post processing
+        distances = np.append([0], distances) # Append a placeholder for the first word
+        block_group = (distances>distance_th).cumsum() # Create a block_group based on the distance threshold
+        grouped_blocks = [lp.Layout([]) for i in range(max(block_group)+1)]
+        for _, block in zip(block_group, i):
+            grouped_blocks[_].append(block)   
+    #    df[str(i)] = pd.Series(grouped_blocks) 
+        list.append(grouped_blocks)
+       
+    return list
+
+def layer_to_df(double_layered_list): 
+    df = pd.DataFrame()
+    for p,i in enumerate(double_layered_list): 
+        list = []
+        for u in i: 
+            textlist = u.get_texts()
+            text = ' '.join(str(e) for e in textlist)
+            list.append(text)
+        df[str(p)] = pd.Series(list)
+    return df
+  
 
 def create_bounding_polygons(bounding_poly = lp.elements.layout_elements.TextBlock, column_dict = cfg['Table']):
     """
+    DEPRECIATED
     Creates a list of bounding polygons for a table given a polygon for the table. Specifications need to be given in config.yml
 
     Arguments: 
@@ -367,8 +428,7 @@ def create_bounding_polygons(bounding_poly = lp.elements.layout_elements.TextBlo
         current_pos = x
     return polygons
 
-
-    
+   
 
 #def main():
     
@@ -380,6 +440,8 @@ if __name__ == '__main__':
     res, ocr_agent = gcv_response(image,1, 'test')
     gcv_block, gcv_para, gcv_word, gcv_char = annotate_res(res, ocr_agent)
     table_poly = to_polygons(table_layout)
+    table_txt = text_layout_from_selection(gcv_word, remove_titles(table_poly[0]))
+
     #testing create polygons
    # ll = create_bounding_polygons(remove_titles(table_poly[1]))
    # hi = gcv_word.filter_by(ll[0], soft_margin = {"left":10, "right":10})
@@ -387,11 +449,12 @@ if __name__ == '__main__':
    # lp.draw_box(image, hi, box_width=4).save("Tests/bruh4.png", "PNG") 
     table_title_1 = isolate_titles(table_poly[0])
     tabletitletext = text_layout_from_selection(gcv_word, table_title_1)
+    
     # %%
     px = cols_px(tabletitletext)
-    a = column_poly(table_poly[0], px, gcv_word)
+    l = remove_many_titles(table_poly)
+    a = column_poly(l[1], px, gcv_word)
     lp.draw_box(image, a, box_width=4).save("Tests/21.png", "PNG")
-
 
 
 # %%
