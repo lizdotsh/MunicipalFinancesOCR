@@ -38,10 +38,12 @@ def gcv_cred(keypath = cfg['Model']['GCV_KEY']):
     x = lp.GCVAgent.with_credential(keypath,languages = ['en'])
     log.info("Specified GCV Credentials")
     return x
-def gcv_res_exists(pagenum = None, docname = cfg['SOURCE_NAME'], OUTPUT_DIRECTORY = cfg['OUTPUT_DIRECTORY']):
+def gcv_res_exists(pagenum = None, cfg=cfg):
     """
     Checks to see if image has already been processed with google cloud
     """
+    OUTPUT_DIRECTORY = cfg['OUTPUT_DIRECTORY']
+    docname = cfg['SOURCE_NAME']
     if pagenum == None: return False 
     if(os.path.isfile('{}/{}/GCV_Res/{}-GCVRes.json'.format(OUTPUT_DIRECTORY, docname, pagenum))): return True 
 
@@ -52,7 +54,7 @@ def gcv_upload(image, ocr_agent = None):
     return res, ocr_agent 
 
  
-def gcv_response(image, pagenum = None, docname = cfg['SOURCE_NAME'], OUTPUT_DIRECTORY = cfg['OUTPUT_DIRECTORY'], ocr_agent = None): 
+def gcv_response(image, pagenum = None, ocr_agent = None, cfg=cfg): 
     """
     This function takes an image and processes it on google cloud vision's OCR tool. If a docname and pagenum are specified, it saves them to /Output/docname/GCV_Res/pagenum-GCVres.json.
 
@@ -66,6 +68,8 @@ def gcv_response(image, pagenum = None, docname = cfg['SOURCE_NAME'], OUTPUT_DIR
         ocr_agent: The ocr_agent variable you set. If not loaded, will use gcv_cred() defaults and load it again. 
     """
     # Tests if working directory exists for specified docname.  
+    OUTPUT_DIRECTORY = cfg['OUTPUT_DIRECTORY']
+    docname = cfg['SOURCE_NAME']
     ocr = True
     if ocr_agent == None: 
         ocr = False
@@ -75,7 +79,7 @@ def gcv_response(image, pagenum = None, docname = cfg['SOURCE_NAME'], OUTPUT_DIR
         log.error("Pagenum not specified. Will not save response")
         res, ocr_agent = gcv_upload(image, ocr_agent=ocr_agent)
     else: 
-        if gcv_res_exists(pagenum=pagenum, docname = docname, OUTPUT_DIRECTORY=OUTPUT_DIRECTORY): 
+        if gcv_res_exists(pagenum=pagenum, cfg=cfg): 
             log.info('GCV Already Processed, loading from file')
             res = ocr_agent.load_response('{}/{}/GCV_Res/{}-GCVRes.json'.format(OUTPUT_DIRECTORY, docname, pagenum))
         else:
@@ -153,11 +157,13 @@ def to_pos_id(y_1 = float, y_2 = float, pagenum = int, docheight = 3850) -> floa
         pagenum: Page number of the page where the selection came from 
         docheight: Height, in pixels, of the array of the document. Defaults to 3850, as that is dpi = 350 of the PDF
     """
-    pos_id = float(pagenum) + (np.mean(y_1, y_2)/docheight)
+    pos_id = float(pagenum) + (((y_1 + y_2)/2)/docheight)
     log.info("Created Log ID {} for page {}".format(pos_id, pagenum))
     return pos_id
 
-def save_det2_model(layout, pagenum = int, OUTPUT_DIRECTORY = cfg['OUTPUT_DIRECTORY'], docname = cfg['SOURCE_NAME']):
+def save_det2_model(layout, pagenum = int, cfg=cfg):
+    OUTPUT_DIRECTORY = cfg['OUTPUT_DIRECTORY']
+    docname = cfg['SOURCE_NAME']
     if pagenum == None: 
         log.error('No pagenum specified')
     else: 
@@ -180,16 +186,20 @@ def save_det2_model(layout, pagenum = int, OUTPUT_DIRECTORY = cfg['OUTPUT_DIRECT
 
  #if __name__ == '__main__':
    # model = load_det2_model()
-def already_in_csv(pagenum, OUTPUT_DIRECTORY = cfg['OUTPUT_DIRECTORY'], docname = cfg['SOURCE_NAME']):
+def already_in_csv(pagenum, cfg=cfg):
     """Tests if model layout has been amended to csv"""
+    OUTPUT_DIRECTORY = cfg['OUTPUT_DIRECTORY']
+    docname = cfg['SOURCE_NAME']
     if not os.path.exists('{}/{}/TableBank_model/'.format(OUTPUT_DIRECTORY,docname)): return False
     df = pd.read_csv('{}/{}/TableBank_model/{}.csv'.format(OUTPUT_DIRECTORY, docname, docname))
     if df['pagenum'].eq(pagenum).any(): 
         return True
     else: 
         return False
-def load_det2_csv(pagenum, OUTPUT_DIRECTORY = cfg["OUTPUT_DIRECTORY"], docname = cfg['SOURCE_NAME']): 
+def load_det2_csv(pagenum, cfg=cfg): 
     """Loads det2 layout from csv"""
+    OUTPUT_DIRECTORY = cfg['OUTPUT_DIRECTORY']
+    docname = cfg['SOURCE_NAME']
     if(os.path.isfile('{}/{}/TableBank_model/{}.csv'.format(OUTPUT_DIRECTORY, docname, docname))):
         log.info('csv exists')
         df = pd.read_csv('{}/{}/TableBank_model/{}.csv'.format(OUTPUT_DIRECTORY, docname, docname))
@@ -200,7 +210,7 @@ def load_det2_csv(pagenum, OUTPUT_DIRECTORY = cfg["OUTPUT_DIRECTORY"], docname =
         log.error('CSV Doesnt exist')
    
 
-def modeled_layout(image, pagenum = None, model = None, padding = cfg['Table']['Padding'], save = True, OUTPUT_DIRECTORY = cfg['OUTPUT_DIRECTORY'], docname = cfg['SOURCE_NAME']):
+def modeled_layout(image, pagenum = None, model = None, cfg = cfg, save = True):
     """
     Takes an image, and returns a Layout variable using the specified model. Then, it pads the model with specified padding. If model not specified, uses default model set by load_det2_model(). If padding not specified, uses padding set by config.yml. 
 
@@ -211,10 +221,12 @@ def modeled_layout(image, pagenum = None, model = None, padding = cfg['Table']['
 
         padding: dictionary of padding. needs to be in the form of a dictionary with 'left', 'right', 'top', and 'bottom' set to various integer values. Reccomended that you leave it default and set them with config.yml   
     """
-
-    if already_in_csv(pagenum, OUTPUT_DIRECTORY = OUTPUT_DIRECTORY, docname=docname): 
+    padding = cfg['Table']['Padding']
+    OUTPUT_DIRECTORY = cfg['OUTPUT_DIRECTORY']
+    docname = cfg['SOURCE_NAME']
+    if already_in_csv(pagenum, cfg=cfg): 
         log.info('Already loaded this model, loading from CSV')
-        return load_det2_csv(pagenum, OUTPUT_DIRECTORY=OUTPUT_DIRECTORY, docname = docname)
+        return load_det2_csv(pagenum, cfg=cfg)
     else: 
         if model == None:
             log.info("Model not specified, loading default from load_det2_model")
@@ -228,7 +240,7 @@ def modeled_layout(image, pagenum = None, model = None, padding = cfg['Table']['
                 log.error('No Pagenum Specified, cannot save')
                 return layout
             else:  
-                save_det2_model(layout, pagenum=pagenum, OUTPUT_DIRECTORY=OUTPUT_DIRECTORY, docname=docname)
+                save_det2_model(layout, pagenum=pagenum, cfg=cfg)
                 return layout
         else:
             return layout
@@ -320,6 +332,7 @@ def column_poly(table_text_poly, cols_px_df, gcv_word, cfgtable = cfg['Table']):
     """
     coords = table_text_poly.coordinates # gets coordinates of the bounding layer
     layouts = []
+    
     for i,x in enumerate(cfgtable['columns']):
              rec = lp.Rectangle(
                 x_1 = (cols_px_df['x_avg'][i] - cfgtable['columns'][x]['hard_margin']['left']),
@@ -394,41 +407,21 @@ def layer_to_df(double_layered_list):
         df[str(p)] = pd.Series(list)
     return df
   
+def cont_or_not(table_poly, gcv_word, cfgtable=cfg['Table']):
+    title = table_poly.pad(-cfgtable['Padding']['top'])
+    titletext = gcv_word.filter_by(
+       title, 
+       soft_margin = cfgtable['cont']['cont_soft_margin']
+    )
+    texts = titletext.get_texts()
+    text = ' '.join(str(e) for e in texts)
+    if bool(re.search(str(cfgtable['cont']['regex']), text.lower())): 
+        return True
+    else: return False
 
-def create_bounding_polygons(bounding_poly = lp.elements.layout_elements.TextBlock, column_dict = cfg['Table']):
-    """
-    DEPRECIATED
-    Creates a list of bounding polygons for a table given a polygon for the table. Specifications need to be given in config.yml
 
-    Arguments: 
-        bounding_poly: Must be a SINGULAR text block rectangle. This means if you just passed a layer file through to_polygons(), you must feed the function a specific polyon in that list. Ex: table_poly[0]
-        column_dict: You can specify a different dictionary specifying the columns if you want. Check config.yml for template. 
-    """
     
-    bounding_coords = bounding_poly.coordinates
-    bounding_width = bounding_poly.width
-    col_widths_frac = []
-    for i in column_dict["columns"]:
-        col_widths_frac.append(column_dict["columns"][i]["width"]) # Gather a list of all the widths in config.yml
-    col_widths_px = []
-    for x in col_widths_frac:
-        col_widths_px.append(x * bounding_width) # Convert those widths into pixel values based on bounding_layer 
-    current_pos = bounding_coords[0]
-    polygons = []
-    for _ in col_widths_px:
-        x = current_pos + _
-        polygons.append(
-            lp.Rectangle(
-                x_1 = current_pos,
-                y_1 = bounding_coords[1],
-                x_2 = x,
-                y_2 = bounding_coords[3]
-            )
-        )
-        current_pos = x
-    return polygons
-
-def parse_table(table_layout, gcv_word, tablenum, distance_th, cfgtable = cfg['Table']): 
+def parse_table(table_layout, gcv_word, tablenum, cfgtable = cfg['Table']): 
     """
     combines many functions into one. Essentially all you need is the table layout, gcv_word, 
     and tablenum and it will return you a dataframe of all of the text within each table
@@ -439,38 +432,110 @@ def parse_table(table_layout, gcv_word, tablenum, distance_th, cfgtable = cfg['T
        soft_margin = cfgtable['title_soft_margin'] 
     )
     px = cols_px(tabletitletext) # location of each column
+    if px.isnull().values.any(): 
+            log.error(px)
+            return px
+    if not len(px['x_avg']) == 6: 
+        print(px)
+        print(tabletitletext)
+        return px
     table_titleless = remove_titles(table_poly[tablenum], cfgtable) # returns poly for specified tablenum but without 
     col_poly = column_poly(table_titleless, px, gcv_word, cfgtable)
-    double_layered = identify_rows(col_poly, distance_th, gcv_word, cfgtable)
+    double_layered = identify_rows(col_poly, cfgtable['distance_th'], gcv_word, cfgtable)
     return layer_to_df(double_layered)
-    
+
+def parse_tables_img(image, gcv_word, pagenum = None, cfg=cfg):
+    """
+    takes an image and gcv_word and turns it a data frame. 
+    arguments: 
+
+    image: ndarray of the page of the image
+    gcv_word: google cloud vision word level 
+    pagenum: optional, will allow calculation of pos_id and adding of coordinates to the dataframe 
+    cfg: defaults to config.yml. This function specifically does not use anything from it, 
+        but it is passed into functions parse_table and modeled_layout, which both use it extensively. 
+    """
+    l = [] # sets list for later use, will become a list of dataframes 
+    table_layout = modeled_layout(image, cfg=cfg, pagenum=pagenum) #uses function to get a modeled layout of the image using det2
+    for i,x in enumerate(table_layout):
+        df = parse_table(table_layout, gcv_word,i , cfgtable=cfg['Table']) # for each table in page, it passes it through parse_table to get dataframe
+        df['x_1'] = x.coordinates[0] # gets coordinates of the table and adds them to dataframe 
+        df['y_1'] = x.coordinates[1]
+        df['x_2'] = x.coordinates[2]
+        df['y_2'] = x.coordinates[3]
+        if type(pagenum) == int: # If a pagenum was specified, it will calculate the position id for it and add it to df 
+            log.info("pagenum {} was selected, calculating pos_id".format(pagenum))
+            df['pagenum'] = pagenum
+            df['pos_id'] = to_pos_id(
+                y_1 = x.coordinates[1],
+                y_2 = x.coordinates[3],
+                pagenum = pagenum,
+                docheight = image.shape[0] #calculates docheight using the height of the ndarray image 
+            )
+        if cfg['Table']['cont']['search']:
+            df['cont'] = cont_or_not(x, gcv_word, cfgtable = cfg['Table'])
+        l.append(df)
+    df = pd.concat(l) # joins the data frames together into one, large data frame 
+    df = df.reset_index() # rests the index so it is a normal index, leaves original index so you can tell the relative
+#     position of each entry in reguards to its table
+    if type(pagenum) == int: 
+        df = df.sort_values(['pos_id', 'index']) # If pagenum specified, will sort the dataframes based on their relative pos_id in the larger df
+    df = df.reset_index(drop=True)
+    return df
+
+def parse_page(pagenum, ocr_agent = None, cfg=cfg):
+    """
+    At the moment, is just a simple wrapper for parse_tables_img to allow you to easily specify each individual page and pdf from config. 
+    Will likely expand later. 
+    """
+    dir = '{}/{}/Parsed_Tables/'.format(cfg['OUTPUT_DIRECTORY'], cfg['SOURCE_NAME'])
+    csv = dir + '{}.csv'.format(pagenum)
+   #dir = '{}/{}/Parsed_Tables/{}.csv'.format(cfg['OUTPUT_DIRECTORY'], cfg['SOURCE_NAME'], pagenum)
+    if not os.path.exists(dir): 
+            os.makedirs(dir)
+            log.warning("Directories not created for this project, created them.")
+    if(os.path.isfile(csv)): 
+        log.info('File exists, returning from disk')
+        return pd.read_csv(csv) 
+    file = "{}/{}".format(cfg['INPUT_DIRECTORY'], cfg['SOURCE_PDF']) # Gets file position from inut directory and name set in config file 
+    image = convert_PDF(file, pagenum)
+    res, ocr_agent = gcv_response(image,pagenum, ocr_agent=ocr_agent, cfg=cfg) # Gets GCV stuff. 
+    gcv_block, gcv_para, gcv_word, gcv_char = annotate_res(res, ocr_agent)
+    df = parse_tables_img(image, gcv_word, pagenum, cfg=cfg) 
+    df.to_csv(csv)
+    log.info('Saved page {} to disk at {}'.format(pagenum, csv))
+    return df 
+   # return image, gcv_word
 #def main():
     
-if __name__ == '__main__':
-    log.info('for debug only')
-    #main()
-    image = np.asarray(pdf2image.convert_from_path('/Users/liz/Documents/Projects/LayoutParser/test.pdf')[1])
-    table_layout = modeled_layout(image)
-    res, ocr_agent = gcv_response(image,1, 'test')
-    gcv_block, gcv_para, gcv_word, gcv_char = annotate_res(res, ocr_agent)
-    table_poly = to_polygons(table_layout)
-    table_txt = text_layout_from_selection(gcv_word, remove_titles(table_poly[0]))
+#if __name__ == '__main__':
+#   log.info('for debug only')
+#   #main()
+#   image = np.asarray(pdf2image.convert_from_path('/Users/liz/Documents/Projects/LayoutParser/test.pdf')[1])
+#   table_layout = modeled_layout(image)
+#   res, ocr_agent = gcv_response(image,1)
+#   gcv_block, gcv_para, gcv_word, gcv_char = annotate_res(res, ocr_agent)
+#   table_poly = to_polygons(table_layout)
+#   table_txt = text_layout_from_selection(gcv_word, remove_titles(table_poly[0]))
 
-    #testing create polygons
-   # ll = create_bounding_polygons(remove_titles(table_poly[1]))
-   # hi = gcv_word.filter_by(ll[0], soft_margin = {"left":10, "right":10})
-   # lp.draw_box(image, ll, box_width=4).save("Tests/bruh3.png", "PNG")
-   # lp.draw_box(image, hi, box_width=4).save("Tests/bruh4.png", "PNG") 
-    table_title_1 = isolate_titles(table_poly[0])
-    tabletitletext = text_layout_from_selection(gcv_word, table_title_1)
-    
-    # %%
-    px = cols_px(tabletitletext)
-    l = remove_many_titles(table_poly)
-    a = column_poly(l[1], px, gcv_word)
-    lp.draw_box(image, a, box_width=4).save("Tests/21.png", "PNG")
+#   #testing create polygons
+#  # ll = create_bounding_polygons(remove_titles(table_poly[1]))
+#  # hi = gcv_word.filter_by(ll[0], soft_margin = {"left":10, "right":10})
+#  # lp.draw_box(image, ll, box_width=4).save("Tests/bruh3.png", "PNG")
+#  # lp.draw_box(image, hi, box_width=4).save("Tests/bruh4.png", "PNG") 
+#   table_title_1 = isolate_titles(table_poly[0])
+#   tabletitletext = text_layout_from_selection(gcv_word, table_title_1)
+#   
+#   # %%
+#   px = cols_px(tabletitletext)
+#   l = remove_many_titles(table_poly)
+#   a = column_poly(l[1], px, gcv_word)
+#   lp.draw_box(image, a, box_width=4).save("Tests/21.png", "PNG")
 
 
 # %%
 
 
+# TODO
+# fix ordering of title of bond
+# find a way to associate rows with each other 
