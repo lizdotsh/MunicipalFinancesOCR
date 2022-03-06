@@ -11,7 +11,7 @@ import layoutparser as lp
 from google.cloud import vision
 from pyparsing import col
 logging.basicConfig(level=logging.INFO)
-log = logging.getLogger("Process")
+log = logging.getLogger("Processing")
 import yaml
 with open('config.yml') as f:
     try:
@@ -19,7 +19,8 @@ with open('config.yml') as f:
         print(dict)
     except yaml.YAMLError as e:
         print(e)
-
+import ocr as o
+import det2 as d2
 
 def convert_PDF(file, pagenum):
     """
@@ -30,117 +31,7 @@ def convert_PDF(file, pagenum):
     pdf = np.asarray(pdf2image.convert_from_path(file, dpi=250, first_page=pagenum, last_page=pagenum)[0])
     log.info("Converted page {} from {}".format(pagenum, file))   
     return pdf
-
-def gcv_cred(keypath = cfg['Model']['GCV_KEY']):
-    """
-    Specifies Google Cloud Vision Credentials. Defaults to keypath in config.yml
-    """
-    x = lp.GCVAgent.with_credential(keypath,languages = ['en'])
-    log.info("Specified GCV Credentials")
-    return x
-def gcv_res_exists(pagenum = None, cfg=cfg):
-    """
-    Checks to see if image has already been processed with google cloud
-    """
-    OUTPUT_DIRECTORY = cfg['OUTPUT_DIRECTORY']
-    docname = cfg['SOURCE_NAME']
-    if pagenum == None: return False 
-    if(os.path.isfile('{}/{}/GCV_Res/{}-GCVRes.json'.format(OUTPUT_DIRECTORY, docname, pagenum))): return True 
-
-def gcv_upload(image, ocr_agent = None): 
-    """Sends image to GCV for detection. Typically used only by gcv_response, as gcv_response checks if this has already been done."""
-    res = ocr_agent.detect(image, return_response = True)
-    log.info('GCV processed/uploaded')
-    return res, ocr_agent 
-
- 
-def gcv_response(image, pagenum = None, ocr_agent = None, cfg=cfg): 
-    """
-    This function takes an image and processes it on google cloud vision's OCR tool. If a docname and pagenum are specified, it saves them to /Output/docname/GCV_Res/pagenum-GCVres.json.
-
-    Arguments: 
-        image: ndarray for image to be processed
-
-        pagenum: pagenum the image is from. Is used to name file when saving. 
-
-        docname: Unique name for document. Use a different name for each, as it changes which folder it is saved in. 
-
-        ocr_agent: The ocr_agent variable you set. If not loaded, will use gcv_cred() defaults and load it again. 
-    """
-    # Tests if working directory exists for specified docname.  
-    OUTPUT_DIRECTORY = cfg['OUTPUT_DIRECTORY']
-    docname = cfg['SOURCE_NAME']
-    ocr = True
-    if ocr_agent == None: 
-        ocr = False
-        log.warning('GCV credentials not loaded, loading with GCV_Cred()')
-        ocr_agent = gcv_cred() 
-    if pagenum == None:
-        log.error("Pagenum not specified. Will not save response")
-        res, ocr_agent = gcv_upload(image, ocr_agent=ocr_agent)
-    else: 
-        if gcv_res_exists(pagenum=pagenum, cfg=cfg): 
-            log.info('GCV Already Processed, loading from file')
-            res = ocr_agent.load_response('{}/{}/GCV_Res/{}-GCVRes.json'.format(OUTPUT_DIRECTORY, docname, pagenum))
-        else:
-            res, ocr_agent = gcv_upload(image, ocr_agent=ocr_agent) 
-            if not os.path.exists('{}/{}/GCV_Res/'.format(OUTPUT_DIRECTORY,docname)): 
-                os.makedirs('{}/{}/GCV_Res/'.format(OUTPUT_DIRECTORY, docname))
-                log.warning("Directories not created for this project, created them.") 
-            ocr_agent.save_response(res,'{}/{}/GCV_Res/{}-GCVRes.json'.format(OUTPUT_DIRECTORY,docname, str(pagenum)))
-            log.info('GCV Saved')          
-    if ocr == True: return res
-    else: return res, ocr_agent
-   
-
-def annotate_res(res, ocr_agent= None): 
-    """
-    Takes res file from GCV and splits it into layout files of three different aggregation levels. gcv_para is the paragraph level, gcv_word is the word level, and gcv_char is the character level. 
-
-    Arguments: 
-        res: The response from google cloud, see gcv_response() for more details
-        ocr_agent: the ocr_agent, will load a new one if one is not specified with gcv_cred()
-    
-    Outputs: 
-        gcv_block: Block level layout file
-        gcv_para: Paragraph level layout file
-        gcv_word: Word level layout file
-        gcv_char: Character level layout file
-        ocr_agent: Returns the ocr_agent variable if one was not specifed initially
-    """
-    ocr = True
-    if ocr_agent == None: 
-        ocr = False
-        log.warning('OCR agent not specified. Loading with GCV_cred()')
-        ocr_agent = gcv_cred()
-        log.info('OCR agent loaded')
-    else: log.info('OCR Agent Specified, continuing')
-    gcv_block = ocr_agent.gather_full_text_annotation(res, agg_level=lp.GCVFeatureType.BLOCK)
-    log.info('Created gcv_block')
-    gcv_para = ocr_agent.gather_full_text_annotation(res, agg_level=lp.GCVFeatureType.PARA)
-    log.info('Created gcv_para')
-    gcv_word = ocr_agent.gather_full_text_annotation(res, agg_level=lp.GCVFeatureType.WORD)
-    log.info('Created gcv_word') 
-    gcv_char = ocr_agent.gather_full_text_annotation(res, agg_level=lp.GCVFeatureType.SYMBOL)
-    log.info('Created gcv_word') 
-    if ocr == True: return gcv_block, gcv_para, gcv_word, gcv_char
-    else: return gcv_block, gcv_para, gcv_word, gcv_char, ocr_agent
-
-
         
-
-def load_det2_model(DET_MODEL_PATH = cfg['Model']['DET_MODEL_PATH'], LABEL_MAP = cfg['Model']['LABEL_MAP']):
-    """
-    Loads the selected Delectron2 model
-        DET_MODEL_PATH: Model path 
-        LABEL_MAP: "Label Map" used by model, see LayoutParser website for more information 
-        Defaults to values in config.yml
-    """
-    model = lp.Detectron2LayoutModel(
-        config_path = DET_MODEL_PATH, 
-        label_map = LABEL_MAP)
-    log.info('Loaded Detectron2 model with LayoutParser')
-    return model
 
 def to_pos_id(y_1 = float, y_2 = float, pagenum = int, docheight = 3850) -> float:
     """
@@ -160,90 +51,6 @@ def to_pos_id(y_1 = float, y_2 = float, pagenum = int, docheight = 3850) -> floa
     pos_id = float(pagenum) + (((y_1 + y_2)/2)/docheight)
     log.info("Created Log ID {} for page {}".format(pos_id, pagenum))
     return pos_id
-
-def save_det2_model(layout, pagenum = int, cfg=cfg):
-    OUTPUT_DIRECTORY = cfg['OUTPUT_DIRECTORY']
-    docname = cfg['SOURCE_NAME']
-    if pagenum == None: 
-        log.error('No pagenum specified')
-    else: 
-        df = layout.to_dataframe()
-        df['pagenum'] = pagenum
-        df['id'] = df.index
-        log.info('Page {} converted to dataframe'.format(pagenum))
-        if not os.path.exists('{}/{}/TableBank_model/'.format(OUTPUT_DIRECTORY,docname)): 
-            os.makedirs('{}/{}/TableBank_model/'.format(OUTPUT_DIRECTORY, docname))
-            log.warning("Directories not created for this project, created them.")
-        if(os.path.isfile('{}/{}/TableBank_model/{}.csv'.format(OUTPUT_DIRECTORY, docname, docname))):
-            log.info('csv exists, writing')
-            df.to_csv('{}/{}/TableBank_model/{}.csv'.format(OUTPUT_DIRECTORY, docname, docname), mode='a', index= False,header=False)
-            log.info('csv has been amended for page {} of {}'.format(pagenum, docname))
-        else:
-            log.warning('csv for {} does not exist, creating'.format(pagenum))
-            df.to_csv('{}/{}/TableBank_model/{}.csv'.format(OUTPUT_DIRECTORY, docname, docname), index= False)
-            log.info('csv created, model saved')
-
-
- #if __name__ == '__main__':
-   # model = load_det2_model()
-def already_in_csv(pagenum, cfg=cfg):
-    """Tests if model layout has been amended to csv"""
-    OUTPUT_DIRECTORY = cfg['OUTPUT_DIRECTORY']
-    docname = cfg['SOURCE_NAME']
-    if not os.path.exists('{}/{}/TableBank_model/'.format(OUTPUT_DIRECTORY,docname)): return False
-    df = pd.read_csv('{}/{}/TableBank_model/{}.csv'.format(OUTPUT_DIRECTORY, docname, docname))
-    if df['pagenum'].eq(pagenum).any(): 
-        return True
-    else: 
-        return False
-def load_det2_csv(pagenum, cfg=cfg): 
-    """Loads det2 layout from csv"""
-    OUTPUT_DIRECTORY = cfg['OUTPUT_DIRECTORY']
-    docname = cfg['SOURCE_NAME']
-    if(os.path.isfile('{}/{}/TableBank_model/{}.csv'.format(OUTPUT_DIRECTORY, docname, docname))):
-        log.info('csv exists')
-        df = pd.read_csv('{}/{}/TableBank_model/{}.csv'.format(OUTPUT_DIRECTORY, docname, docname))
-        df = df[df['pagenum'] == pagenum]
-        layout = lp.io.load_dataframe(df)
-        return layout
-    else: 
-        log.error('CSV Doesnt exist')
-   
-
-def modeled_layout(image, pagenum = None, model = None, cfg = cfg, save = True):
-    """
-    Takes an image, and returns a Layout variable using the specified model. Then, it pads the model with specified padding. If model not specified, uses default model set by load_det2_model(). If padding not specified, uses padding set by config.yml. 
-
-    Arguments: 
-        image: ndarray, image to be used in model.detect()
-
-        model: Detectron2 model. Will default to reloading the model if unspecified. 
-
-        padding: dictionary of padding. needs to be in the form of a dictionary with 'left', 'right', 'top', and 'bottom' set to various integer values. Reccomended that you leave it default and set them with config.yml   
-    """
-    padding = cfg['Table']['Padding']
-    OUTPUT_DIRECTORY = cfg['OUTPUT_DIRECTORY']
-    docname = cfg['SOURCE_NAME']
-    if already_in_csv(pagenum, cfg=cfg): 
-        log.info('Already loaded this model, loading from CSV')
-        return load_det2_csv(pagenum, cfg=cfg)
-    else: 
-        if model == None:
-            log.info("Model not specified, loading default from load_det2_model")
-            model = load_det2_model()
-        else: 
-            log.info("Model Specified, continuing") 
-        layout = model.detect(image).pad(**padding)
-        log.info("Model ran on image")
-        if save == True:
-            if pagenum == None:
-                log.error('No Pagenum Specified, cannot save')
-                return layout
-            else:  
-                save_det2_model(layout, pagenum=pagenum, cfg=cfg)
-                return layout
-        else:
-            return layout
    
            
 def layout_excluding_layout(layout, filter_layout):
@@ -456,7 +263,7 @@ def parse_tables_img(image, gcv_word, pagenum = None, cfg=cfg):
         but it is passed into functions parse_table and modeled_layout, which both use it extensively. 
     """
     l = [] # sets list for later use, will become a list of dataframes 
-    table_layout = modeled_layout(image, cfg=cfg, pagenum=pagenum) #uses function to get a modeled layout of the image using det2
+    table_layout = d2.modeled_layout(image, cfg=cfg, pagenum=pagenum) #uses function to get a modeled layout of the image using det2
     for i,x in enumerate(table_layout):
         df = parse_table(table_layout, gcv_word,i , cfgtable=cfg['Table']) # for each table in page, it passes it through parse_table to get dataframe
         df['x_1'] = x.coordinates[0] # gets coordinates of the table and adds them to dataframe 
@@ -499,8 +306,8 @@ def parse_page(pagenum, ocr_agent = None, cfg=cfg):
         return pd.read_csv(csv) 
     file = "{}/{}".format(cfg['INPUT_DIRECTORY'], cfg['SOURCE_PDF']) # Gets file position from inut directory and name set in config file 
     image = convert_PDF(file, pagenum)
-    res, ocr_agent = gcv_response(image,pagenum, ocr_agent=ocr_agent, cfg=cfg) # Gets GCV stuff. 
-    gcv_block, gcv_para, gcv_word, gcv_char = annotate_res(res, ocr_agent)
+    res, ocr_agent = o.gcv_response(image,pagenum, ocr_agent=ocr_agent, cfg=cfg) # Gets GCV stuff. 
+    gcv_block, gcv_para, gcv_word, gcv_char = o.annotate_res(res, ocr_agent)
     df = parse_tables_img(image, gcv_word, pagenum, cfg=cfg) 
     df.to_csv(csv)
     log.info('Saved page {} to disk at {}'.format(pagenum, csv))
