@@ -119,7 +119,7 @@ def cols_px(bounding, cfgtable = cfg['Table']):
             if bool(re.search(str(cfgtable['columns'][i]['regex']), _.lower())): 
                 df1 = df[df['text'] == _][['x_avg']]
                 df1['ColNum'] = x
-                namedf = namedf.append(df1)
+                namedf = pd.concat([namedf, df1 ])
                 log.info('Appended column {}'.format(x))
        # re.search([i]['regex'])
     return namedf.reset_index(drop=True)
