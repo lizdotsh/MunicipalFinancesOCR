@@ -375,5 +375,6 @@ def parse_page(pagenum, ocr_agent = None, overwrite = False, model = None, cfg=c
 
 
 # TODO
-# fix ordering of title of bond
-# find a way to associate rows with each other 
+# Find a way to filter out or exclude the row titles from ending up in the df 
+# find a way to filter in regex by more than one string. 
+# Change the method of finding nearest to use the average position not just y_1
