@@ -13,7 +13,6 @@ from pyparsing import col
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("Processing")
 import yaml
-from merge_closest import merge_closest
 with open('config.yml') as f:
     try:
         cfg = yaml.load(f, Loader=yaml.SafeLoader)
@@ -204,89 +203,36 @@ def identify_rows(col_txt_list, distance_th, gcv_word, cfgtable = cfg['Table']):
        
     return list
 
-def layer_to_df2(double_layered_list, height_th = 3, cfgtable = cfg['Table']): 
-#   df = pd.DataFrame()
-    idx = [0 for i in double_layered_list]
-    idxmax = [len(i) for i in double_layered_list]
-    tot = []
-    while np.logical_not([((idx[i]) < (idxmax[i])) for i,x in enumerate(idx)]).any() == False: 
-        text = []
-        coords = [double_layered_list[i][x][0].coordinates[1] for i,x in enumerate(idx)]
-        row = [double_layered_list[i][x] for i,x in enumerate(idx)]
-        for it,c in enumerate(coords): 
-            if it == 0:
-                sort = sorted(row[it], key = lambda x: x.coordinates[0])
-                text.append(' '.join(lp.Layout(sort).get_texts()))
-                idx[it] += 1
-            elif abs(coords[it-1] - coords[it] < height_th): 
-                sort = sorted(row[it], key = lambda x: x.coordinates[0])
-                text.append(' '.join(lp.Layout(sort).get_texts()))
-                idx[it] += 1#; idx[it-1] += 1
-            elif coords[it-1] < coords[it]:  
-                text.append('')
-      #     else: 
-      #         if it <= len(coords) 
-
-           #     idx[it] 
-        tot.append(text)
-    return tot, text, idx, idxmax
-
-
-##      for u,d in enumerate(idx): 
-##          if d < idxmax[u]: 
-##              idx[u] = "done"
-##      for x in max(idxmax): 
-##          row = []
-##          for num in double_layered_list[x]:
-##              first = num[x][0]
-##              if len(row) == 0: 
-##                  row.append(first)
-##                  idx[0] += 1
-##              elif abs(double_layered_list[])
-
-
-##          
-##      coords = [double_layered_list[i][x][0] for i,x in enumerate(idx)]
-##  for p,i in enumerate(double_layered_list): 
-##      for g in double_layered_list[p]
-##      for l in len(double_layered_list[i]): 
-##      list = []
-##      for u in i: 
-
-##          textlist = u.get_texts()
-##          text = ' '.join(str(e) for e in textlist)
-##          list.append(text)
-##      tot.append(list) 
-#       df[str(p)] = pd.Series(list)
- #  return tot#df
 
 def layer_to_df(double_layered_list): 
-    df = pd.DataFrame()
-    count = 0
-    for p,i in enumerate(double_layered_list): 
-        col = pd.DataFrame()
+    """
+    Converts double layered list from identify_rows into a dataframe. 
+
+    Issues: 
+        - If first row has the incorrect number of columns, it will run into issues. Requires more testing 
+    """
+    count = 0 # simple count used to tell if this is the first row of the dataframe or not. ``
+    for p,i in enumerate(double_layered_list):  #Enumerates over the double layered list. p gives integer number and i gives the value 
+        col = pd.DataFrame() # Creates another df that only lasts for one loop. Is used to store the y value of each one to aid in matching 
         list = []
         y1list = []
         for u in i: 
-            sort = sorted(u, key = lambda x: x.coordinates[0])
-            text = ' '.join(lp.Layout(sort).get_texts())
-            textlist = u.get_texts()
-            y1 = u[0].coordinates[1]
+            sort = sorted(u, key = lambda x: x.coordinates[0]) # inside each row/col pair, there are sometimes multiple text boxes. 
+            text = ' '.join(lp.Layout(sort).get_texts())  # This sorts these text boxes from left to right according to x value, so they combine correctly
+            y1 = u[0].coordinates[1] # Gets y_1 coordinate for this entry 
             list.append(text)
             y1list.append(y1)
-        col['y_1'] = pd.Series(y1list)
-        col[str(p)] = pd.Series(list)
+        col['y_1'] = pd.Series(y1list) # adds coordinates to df
+        col[str(p)] = pd.Series(list) # adds corresponding text to each 
         if count == 0: 
-            df = col.copy()
-            #df['ind'] = df['y_1']
-        #if count == 1: 
-        #    df1 = col.copy()
-        if not count == 0: 
-           # df1 = merge_closest(col, df.reset_index(), "y_1", "ind")
-            df1 = pd.merge_asof(left = col, right = df.reset_index(), on='y_1', direction='nearest')
+            df = col.copy() # If first row, creates dataframe entirely
+        if not count == 0:  # If not the first, continues. Below is a bit complicated, basically merges to nearest value
+            df1 = pd.merge_asof(left = col, right = df.reset_index(), on='y_1', direction='nearest') 
+            # I had split it into two separate things, by reversing the first merge and then merging on the index of the first merge
+            # Otherwise, if the right side had less than the original left side, it would just duplicate the nearest one. This makes it unique assignment 
             df = df.merge(df1[['index', str(p)]], how='left', left_index=True,  right_on='index').set_index('index')
         count += 1
-    df = df.drop(columns='y_1')
+    df = df.drop(columns='y_1') # Drops coords as they aren't needed
     return df
   
   
