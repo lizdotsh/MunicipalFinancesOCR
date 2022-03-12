@@ -13,6 +13,7 @@ from pyparsing import col
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("Processing")
 import yaml
+from merge_closest import merge_closest
 with open('config.yml') as f:
     try:
         cfg = yaml.load(f, Loader=yaml.SafeLoader)
@@ -178,7 +179,7 @@ def identify_rows(col_txt_list, distance_th, gcv_word, cfgtable = cfg['Table']):
     """
     used to dynamically calculate rows based on distances between the x values of various things. 
     col_text_list must be a list of polygons defining the various different columns, and must not have a title in it. 
-    distance_th is the distance between the center of the polygons 
+    distance_th is the distance between the cenwter of the polygons 
     gcv_word is google cloud word thing 
     returns list of list, first subsetting is by col second is by row. 
     """
@@ -203,16 +204,91 @@ def identify_rows(col_txt_list, distance_th, gcv_word, cfgtable = cfg['Table']):
        
     return list
 
+def layer_to_df2(double_layered_list, height_th = 3, cfgtable = cfg['Table']): 
+#   df = pd.DataFrame()
+    idx = [0 for i in double_layered_list]
+    idxmax = [len(i) for i in double_layered_list]
+    tot = []
+    while np.logical_not([((idx[i]) < (idxmax[i])) for i,x in enumerate(idx)]).any() == False: 
+        text = []
+        coords = [double_layered_list[i][x][0].coordinates[1] for i,x in enumerate(idx)]
+        row = [double_layered_list[i][x] for i,x in enumerate(idx)]
+        for it,c in enumerate(coords): 
+            if it == 0:
+                sort = sorted(row[it], key = lambda x: x.coordinates[0])
+                text.append(' '.join(lp.Layout(sort).get_texts()))
+                idx[it] += 1
+            elif abs(coords[it-1] - coords[it] < height_th): 
+                sort = sorted(row[it], key = lambda x: x.coordinates[0])
+                text.append(' '.join(lp.Layout(sort).get_texts()))
+                idx[it] += 1#; idx[it-1] += 1
+            elif coords[it-1] < coords[it]:  
+                text.append('')
+      #     else: 
+      #         if it <= len(coords) 
+
+           #     idx[it] 
+        tot.append(text)
+    return tot, text, idx, idxmax
+
+
+##      for u,d in enumerate(idx): 
+##          if d < idxmax[u]: 
+##              idx[u] = "done"
+##      for x in max(idxmax): 
+##          row = []
+##          for num in double_layered_list[x]:
+##              first = num[x][0]
+##              if len(row) == 0: 
+##                  row.append(first)
+##                  idx[0] += 1
+##              elif abs(double_layered_list[])
+
+
+##          
+##      coords = [double_layered_list[i][x][0] for i,x in enumerate(idx)]
+##  for p,i in enumerate(double_layered_list): 
+##      for g in double_layered_list[p]
+##      for l in len(double_layered_list[i]): 
+##      list = []
+##      for u in i: 
+
+##          textlist = u.get_texts()
+##          text = ' '.join(str(e) for e in textlist)
+##          list.append(text)
+##      tot.append(list) 
+#       df[str(p)] = pd.Series(list)
+ #  return tot#df
+
 def layer_to_df(double_layered_list): 
     df = pd.DataFrame()
+    count = 0
     for p,i in enumerate(double_layered_list): 
+        col = pd.DataFrame()
         list = []
+        y1list = []
         for u in i: 
+            sort = sorted(u, key = lambda x: x.coordinates[0])
+            text = ' '.join(lp.Layout(sort).get_texts())
             textlist = u.get_texts()
-            text = ' '.join(str(e) for e in textlist)
+            y1 = u[0].coordinates[1]
             list.append(text)
-        df[str(p)] = pd.Series(list)
+            y1list.append(y1)
+        col['y_1'] = pd.Series(y1list)
+        col[str(p)] = pd.Series(list)
+        if count == 0: 
+            df = col.copy()
+            #df['ind'] = df['y_1']
+        #if count == 1: 
+        #    df1 = col.copy()
+        if not count == 0: 
+           # df1 = merge_closest(col, df.reset_index(), "y_1", "ind")
+            df1 = pd.merge_asof(left = col, right = df.reset_index(), on='y_1', direction='nearest')
+            df = df.merge(df1[['index', str(p)]], how='left', left_index=True,  right_on='index').set_index('index')
+        count += 1
+    df = df.drop(columns='y_1')
     return df
+  
   
 def cont_or_not(table_poly, gcv_word, cfgtable=cfg['Table']):
     title = table_poly.pad(-cfgtable['Padding']['top'])
@@ -251,7 +327,7 @@ def parse_table(table_layout, gcv_word, tablenum, cfgtable = cfg['Table']):
     double_layered = identify_rows(col_poly, cfgtable['distance_th'], gcv_word, cfgtable)
     return layer_to_df(double_layered)
 
-def parse_tables_img(image, gcv_word, pagenum = None, cfg=cfg):
+def parse_tables_img(image, gcv_word, pagenum = None, model = None, cfg=cfg):
     """
     takes an image and gcv_word and turns it a data frame. 
     arguments: 
@@ -263,7 +339,7 @@ def parse_tables_img(image, gcv_word, pagenum = None, cfg=cfg):
         but it is passed into functions parse_table and modeled_layout, which both use it extensively. 
     """
     l = [] # sets list for later use, will become a list of dataframes 
-    table_layout = d2.modeled_layout(image, cfg=cfg, pagenum=pagenum) #uses function to get a modeled layout of the image using det2
+    table_layout, model = d2.modeled_layout(image, cfg=cfg, pagenum=pagenum, model=model) #uses function to get a modeled layout of the image using det2
     for i,x in enumerate(table_layout):
         df = parse_table(table_layout, gcv_word,i , cfgtable=cfg['Table']) # for each table in page, it passes it through parse_table to get dataframe
         df['x_1'] = x.coordinates[0] # gets coordinates of the table and adds them to dataframe 
@@ -288,9 +364,9 @@ def parse_tables_img(image, gcv_word, pagenum = None, cfg=cfg):
     if type(pagenum) == int: 
         df = df.sort_values(['pos_id', 'index']) # If pagenum specified, will sort the dataframes based on their relative pos_id in the larger df
     df = df.reset_index(drop=True)
-    return df
+    return df, model
 
-def parse_page(pagenum, ocr_agent = None, cfg=cfg):
+def parse_page(pagenum, ocr_agent = None, model = None, cfg=cfg):
     """
     At the moment, is just a simple wrapper for parse_tables_img to allow you to easily specify each individual page and pdf from config. 
     Will likely expand later. 
@@ -307,15 +383,23 @@ def parse_page(pagenum, ocr_agent = None, cfg=cfg):
     file = "{}/{}".format(cfg['INPUT_DIRECTORY'], cfg['SOURCE_PDF']) # Gets file position from inut directory and name set in config file 
     image = convert_PDF(file, pagenum)
     res, ocr_agent = o.gcv_response(image,pagenum, ocr_agent=ocr_agent, cfg=cfg) # Gets GCV stuff. 
-    gcv_block, gcv_para, gcv_word, gcv_char = o.annotate_res(res, ocr_agent)
-    df = parse_tables_img(image, gcv_word, pagenum, cfg=cfg) 
+    gcv_block, gcv_para, gcv_word, gcv_char, ocr_agent = o.annotate_res(res, ocr_agent)
+    df, model = parse_tables_img(image, gcv_word, pagenum, model=model, cfg=cfg) 
     df.to_csv(csv)
     log.info('Saved page {} to disk at {}'.format(pagenum, csv))
-    return df 
-   # return image, gcv_word
+    return df, ocr_agent, model
+    #return image, gcv_word
 #def main():
     
 #if __name__ == '__main__':
+  # pagenum = 88
+  # file = "{}/{}".format(cfg["INPUT_DIRECTORY"], cfg["SOURCE_PDF"])
+  # image = convert_PDF(file,pagenum)
+  # res, ocr_agent = o.gcv_response(image,pagenum, cfg=cfg)  #
+  # gcv_block, gcv_para, gcv_word, gcv_char, ocr_agent = o.annotate_res(res, ocr_agent)
+  # a = d2.modeled_layout(image)
+   # parse_table(d2.modeled_layout(image)[0], gcv_word, 1)
+
 #   log.info('for debug only')
 #   #main()
 #   image = np.asarray(pdf2image.convert_from_path('/Users/liz/Documents/Projects/LayoutParser/test.pdf')[1])

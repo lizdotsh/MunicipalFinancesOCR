@@ -98,7 +98,7 @@ def modeled_layout(image, pagenum = None, model = None, cfg = cfg, save = True):
     docname = cfg['SOURCE_NAME']
     if already_in_csv(pagenum, cfg=cfg): 
         log.info('Already loaded this model, loading from CSV')
-        return load_det2_csv(pagenum, cfg=cfg)
+        return load_det2_csv(pagenum, cfg=cfg), model
     else: 
         if model == None:
             log.info("Model not specified, loading default from load_det2_model")
@@ -110,9 +110,9 @@ def modeled_layout(image, pagenum = None, model = None, cfg = cfg, save = True):
         if save == True:
             if pagenum == None:
                 log.error('No Pagenum Specified, cannot save')
-                return layout
+                return layout, model
             else:  
                 save_det2_model(layout, pagenum=pagenum, cfg=cfg)
-                return layout
+                return layout, model
         else:
-            return layout
+            return layout, model

@@ -110,6 +110,6 @@ def annotate_res(res, ocr_agent= None):
     log.info('Created gcv_word') 
     gcv_char = ocr_agent.gather_full_text_annotation(res, agg_level=lp.GCVFeatureType.SYMBOL)
     log.info('Created gcv_word') 
-    if ocr == True: return gcv_block, gcv_para, gcv_word, gcv_char
-    else: return gcv_block, gcv_para, gcv_word, gcv_char, ocr_agent
-
+    #if ocr == True: return gcv_block, gcv_para, gcv_word, gcv_char
+    #else: return gcv_block, gcv_para, gcv_word, gcv_char, ocr_agent
+    return gcv_block, gcv_para, gcv_word, gcv_char, ocr_agent
