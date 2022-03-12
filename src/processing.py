@@ -312,7 +312,7 @@ def parse_tables_img(image, gcv_word, pagenum = None, model = None, cfg=cfg):
     df = df.reset_index(drop=True)
     return df, model
 
-def parse_page(pagenum, ocr_agent = None, model = None, cfg=cfg):
+def parse_page(pagenum, ocr_agent = None, overwrite = False, model = None, cfg=cfg):
     """
     At the moment, is just a simple wrapper for parse_tables_img to allow you to easily specify each individual page and pdf from config. 
     Will likely expand later. 
@@ -324,8 +324,9 @@ def parse_page(pagenum, ocr_agent = None, model = None, cfg=cfg):
             os.makedirs(dir)
             log.warning("Directories not created for this project, created them.")
     if(os.path.isfile(csv)): 
-        log.info('File exists, returning from disk')
-        return pd.read_csv(csv) 
+        if overwrite == False: 
+            log.info('File exists, returning from disk')
+            return pd.read_csv(csv) 
     file = "{}/{}".format(cfg['INPUT_DIRECTORY'], cfg['SOURCE_PDF']) # Gets file position from inut directory and name set in config file 
     image = convert_PDF(file, pagenum)
     res, ocr_agent = o.gcv_response(image,pagenum, ocr_agent=ocr_agent, cfg=cfg) # Gets GCV stuff. 
