@@ -5,9 +5,11 @@ import pdf2image
 import pandas as pd
 import os
 import sys
+import io
 import logging
 import re
 import layoutparser as lp
+from PIL import Image
 from google.cloud import vision
 from pyparsing import col
 logging.basicConfig(level=logging.INFO)
@@ -110,14 +112,18 @@ def cols_px(bounding, cfgtable = cfg['Table']):
     
     """
     df = bounding.to_dataframe() # Turns into dataframe
-    df['x_1'] = [i[0] for i in df['points']] # separates coordinates 
-    df['x_2'] = [i[2] for i in df['points']]
-    df['x_avg'] = (df['x_1'] + df['x_2'])/2
+    try:
+        df['x_1'] = [i[0] for i in df['points']] # separates coordinates 
+        df['x_2'] = [i[2] for i in df['points']]
+        df['x_avg'] = (df['x_1'] + df['x_2'])/2
+    except: 
+        log.error(df)
+        log.error(bounding)
     namedf = pd.DataFrame(columns=['ColNum', 'x_avg'])
     for x,i in enumerate(cfgtable['columns']):
         for _ in df['text']:
             if bool(re.search(str(cfgtable['columns'][i]['regex']), _.lower())): 
-                df1 = df[df['text'] == _][['x_avg']]
+                df1 = df[df['text'] == _].copy()
                 df1['ColNum'] = x
                 namedf = pd.concat([namedf, df1 ])
                 log.info('Appended column {}'.format(x))
@@ -174,7 +180,7 @@ def txt_from_col_poly(col_poly, gcv_word, cfgtable = cfg['Table']):
     return cols
 
 
-def identify_rows(col_txt_list, distance_th, gcv_word, cfgtable = cfg['Table']): 
+def identify_rows(col_txt_list, distance_th, gcv_word, tabletitletext, cfgtable = cfg['Table']): 
     """
     used to dynamically calculate rows based on distances between the x values of various things. 
     col_text_list must be a list of polygons defining the various different columns, and must not have a title in it. 
@@ -186,6 +192,7 @@ def identify_rows(col_txt_list, distance_th, gcv_word, cfgtable = cfg['Table']):
     #df = pd.DataFrame()
     blocks = txt_from_col_poly(col_txt_list, gcv_word, cfgtable)
     o = 0
+    
     for i in blocks: 
         i = sorted(i, key = lambda x: x.coordinates[1]) # Sort the blocks vertically from top to bottom
         distances = np.array([((b2.coordinates[1] + b2.coordinates[3])/2) - ((b1.coordinates[3] + b1.coordinates[1])/2) for (b1, b2) in zip(i, i[1:])])
@@ -199,6 +206,10 @@ def identify_rows(col_txt_list, distance_th, gcv_word, cfgtable = cfg['Table']):
         for _, block in zip(block_group, i):
             grouped_blocks[_].append(block)   
     #    df[str(i)] = pd.Series(grouped_blocks) 
+        #for i in lp.io.load_csv(io.StringIO(px.to_csv())):
+        #    if i in grouped_blocks: grouped_blocks.remove(i) 
+        for i in tabletitletext: 
+            if i in grouped_blocks: grouped_blocks.remove(i)
         list.append(grouped_blocks)
        
     return list
@@ -250,17 +261,24 @@ def cont_or_not(table_poly, gcv_word, cfgtable=cfg['Table']):
 
 
     
-def parse_table(table_layout, gcv_word, tablenum, cfgtable = cfg['Table']): 
+def parse_table(table_layout, gcv_word, tablenum, image, cfgtable = cfg['Table']): 
     """
     combines many functions into one. Essentially all you need is the table layout, gcv_word, 
     and tablenum and it will return you a dataframe of all of the text within each table
     """
     table_poly = to_polygons(table_layout) # Convert to polygon 
+    isolated = isolate_titles(table_poly[tablenum], cfgtable)
     tabletitletext = gcv_word.filter_by(
-       isolate_titles(table_poly[tablenum], cfgtable),
+       isolated,
        soft_margin = cfgtable['title_soft_margin'] 
     )
-    px = cols_px(tabletitletext) # location of each column
+    try: px = cols_px(tabletitletext, cfgtable) # location of each column
+    except: 
+        im = Image.fromarray(isolated.crop_image(image))
+        im.save('Tests/{}_isolated.png'.format(tablenum), 'PNG')
+        #im = Image.fromarray(table_poly.crop_image(image))
+        #im.save('Tests/{}.png'.format(tablenum), 'PNG')
+        log.error(isolated)
     if px.isnull().values.any(): 
             log.error(px)
             return px
@@ -270,8 +288,11 @@ def parse_table(table_layout, gcv_word, tablenum, cfgtable = cfg['Table']):
         return px
     table_titleless = remove_titles(table_poly[tablenum], cfgtable) # returns poly for specified tablenum but without 
     col_poly = column_poly(table_titleless, px, gcv_word, cfgtable)
-    double_layered = identify_rows(col_poly, cfgtable['distance_th'], gcv_word, cfgtable)
-    return layer_to_df(double_layered)
+    double_layered = identify_rows(col_poly, cfgtable['distance_th'], gcv_word, tabletitletext, cfgtable)
+    df = layer_to_df(double_layered)
+    log.info('finished parse_table')
+    log.info(df)
+    return df
 
 def parse_tables_img(image, gcv_word, pagenum = None, model = None, cfg=cfg):
     """
@@ -287,7 +308,7 @@ def parse_tables_img(image, gcv_word, pagenum = None, model = None, cfg=cfg):
     l = [] # sets list for later use, will become a list of dataframes 
     table_layout, model = d2.modeled_layout(image, cfg=cfg, pagenum=pagenum, model=model) #uses function to get a modeled layout of the image using det2
     for i,x in enumerate(table_layout):
-        df = parse_table(table_layout, gcv_word,i , cfgtable=cfg['Table']) # for each table in page, it passes it through parse_table to get dataframe
+        df = parse_table(table_layout, gcv_word,i, image , cfgtable=cfg['Table']) # for each table in page, it passes it through parse_table to get dataframe
         df['x_1'] = x.coordinates[0] # gets coordinates of the table and adds them to dataframe 
         df['y_1'] = x.coordinates[1]
         df['x_2'] = x.coordinates[2]
@@ -310,6 +331,8 @@ def parse_tables_img(image, gcv_word, pagenum = None, model = None, cfg=cfg):
     if type(pagenum) == int: 
         df = df.sort_values(['pos_id', 'index']) # If pagenum specified, will sort the dataframes based on their relative pos_id in the larger df
     df = df.reset_index(drop=True)
+    log.info('finished parse_tables_img')
+    log.info(df)
     return df, model
 
 def parse_page(pagenum, ocr_agent = None, overwrite = False, model = None, cfg=cfg):
@@ -334,9 +357,19 @@ def parse_page(pagenum, ocr_agent = None, overwrite = False, model = None, cfg=c
     df, model = parse_tables_img(image, gcv_word, pagenum, model=model, cfg=cfg) 
     df.to_csv(csv)
     log.info('Saved page {} to disk at {}'.format(pagenum, csv))
-    return df, ocr_agent, model
+    return df,  ocr_agent, model
     #return image, gcv_word
 #def main():
+def preload_gcv(pagenum, ocr_agent=None, cfg=cfg):
+    file = "{}/{}".format(cfg['INPUT_DIRECTORY'], cfg['SOURCE_PDF']) # Gets file position from inut directory and name set in config file 
+    image = convert_PDF(file, 1)
+    res, ocr_agent = o.gcv_response(image, 1, ocr_agent=ocr_agent, cfg=cfg)
+    for i in range(2,pagenum): 
+        image = convert_PDF(file, i)
+        log.info('converted page {}'.format(i))
+        res = o.gcv_response(image, i, ocr_agent=ocr_agent, cfg=cfg)
+        log.info('preloaded page {}'.format(i))
+
     
 #if __name__ == '__main__':
   # pagenum = 88

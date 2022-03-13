@@ -66,8 +66,8 @@ def gcv_response(image, pagenum = None, ocr_agent = None, cfg=cfg):
         log.error("Pagenum not specified. Will not save response")
         res, ocr_agent = gcv_upload(image, ocr_agent=ocr_agent)
     else: 
-        if gcv_res_exists(pagenum=pagenum, cfg=cfg): 
-            log.info('GCV Already Processed, loading from file')
+        if bool(gcv_res_exists(pagenum=pagenum, cfg=cfg)): 
+            log.info('GCV Already Processed {}, loading from file'.format(pagenum))
             res = ocr_agent.load_response('{}/{}/GCV_Res/{}-GCVRes.json'.format(OUTPUT_DIRECTORY, docname, pagenum))
         else:
             res, ocr_agent = gcv_upload(image, ocr_agent=ocr_agent) 
