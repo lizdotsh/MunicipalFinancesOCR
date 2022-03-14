@@ -319,7 +319,7 @@ def parse_tables_img(image, gcv_word, pagenum = None, model = None, cfg=cfg):
             df['pos_id'] = to_pos_id(
                 y_1 = x.coordinates[1],
                 y_2 = x.coordinates[3],
-                pagenum = pagenum,
+                pagenum = pagenum
                 docheight = image.shape[0] #calculates docheight using the height of the ndarray image 
             )
         if cfg['Table']['cont']['search']:
@@ -349,7 +349,7 @@ def parse_page(pagenum, ocr_agent = None, overwrite = False, model = None, cfg=c
     if(os.path.isfile(csv)): 
         if overwrite == False: 
             log.info('File exists, returning from disk')
-            return pd.read_csv(csv) 
+            return pd.read_csv(csv), ocr_agent, model
     file = "{}/{}".format(cfg['INPUT_DIRECTORY'], cfg['SOURCE_PDF']) # Gets file position from inut directory and name set in config file 
     image = convert_PDF(file, pagenum)
     res, ocr_agent = o.gcv_response(image,pagenum, ocr_agent=ocr_agent, cfg=cfg) # Gets GCV stuff. 
@@ -370,7 +370,24 @@ def preload_gcv(pagenum, ocr_agent=None, cfg=cfg):
         res = o.gcv_response(image, i, ocr_agent=ocr_agent, cfg=cfg)
         log.info('preloaded page {}'.format(i))
 
-    
+def multirun(start, end, overwrite=False):
+    """
+    Simple script for doing many pages at once
+    """
+    failed = []
+    suceeded = []
+    df, ocr_agent, model = parse_page(start, overwrite=overwrite)
+    for x in range(start, end):
+        try:
+            df, ocr_agent, model = parse_page(x, ocr_agent=ocr_agent, model=model, overwrite=overwrite)
+            log.info(df)
+            suceeded.append(x)
+        except:
+            log.error("page {} failed".format(x))
+            failed.append(x)
+            pass    
+    log.error(failed)
+    log.info(suceeded)
 #if __name__ == '__main__':
   # pagenum = 88
   # file = "{}/{}".format(cfg["INPUT_DIRECTORY"], cfg["SOURCE_PDF"])
