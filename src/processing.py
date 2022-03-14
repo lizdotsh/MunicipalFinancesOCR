@@ -357,7 +357,7 @@ def parse_page(pagenum, ocr_agent = None, overwrite = False, model = None, cfg=c
     df, model = parse_tables_img(image, gcv_word, pagenum, model=model, cfg=cfg) 
     df.to_csv(csv)
     log.info('Saved page {} to disk at {}'.format(pagenum, csv))
-    return df,  ocr_agent, model
+    return df, ocr_agent, model
     #return image, gcv_word
 #def main():
 def preload_gcv(pagenum, ocr_agent=None, cfg=cfg):

@@ -76,9 +76,7 @@ def gcv_response(image, pagenum = None, ocr_agent = None, cfg=cfg):
                 log.warning("Directories not created for this project, created them.") 
             ocr_agent.save_response(res,'{}/{}/GCV_Res/{}-GCVRes.json'.format(OUTPUT_DIRECTORY,docname, str(pagenum)))
             log.info('GCV Saved')          
-    if ocr == True: return res
-    else: return res, ocr_agent
-   
+    return res, ocr_agent
 
 def annotate_res(res, ocr_agent= None): 
     """
