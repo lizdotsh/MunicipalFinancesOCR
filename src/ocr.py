@@ -5,7 +5,9 @@ import sys
 import logging
 import re
 import layoutparser as lp
-from google.cloud import vision
+
+
+
 from pyparsing import col
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("OCR")

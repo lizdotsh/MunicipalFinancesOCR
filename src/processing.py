@@ -319,7 +319,7 @@ def parse_tables_img(image, gcv_word, pagenum = None, model = None, cfg=cfg):
             df['pos_id'] = to_pos_id(
                 y_1 = x.coordinates[1],
                 y_2 = x.coordinates[3],
-                pagenum = pagenum
+                pagenum = pagenum,
                 docheight = image.shape[0] #calculates docheight using the height of the ndarray image 
             )
         if cfg['Table']['cont']['search']:
@@ -421,10 +421,8 @@ def multirun(start, end, overwrite=False):
 #   lp.draw_box(image, a, box_width=4).save("Tests/21.png", "PNG")
 
 
-# %%
-
-
-# TODO
 # Find a way to filter out or exclude the row titles from ending up in the df 
 # find a way to filter in regex by more than one string. 
+# Idea to do this: Assign it so you cant have repeats, essentially. Or alternative, group titles together.
 # Change the method of finding nearest to use the average position not just y_1
+
