@@ -10,7 +10,6 @@ import logging
 import re
 import layoutparser as lp
 from PIL import Image
-from google.cloud import vision
 from pyparsing import col
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("Processing")
@@ -109,6 +108,7 @@ def to_polygons(bounding_layer):
 def cols_px(bounding, cfgtable = cfg['Table']):
     """
     uses settings in config.yml to determine the location of each column based on the location of the column titles. 
+    Still a bit of WIP, changes in config.yml will change a lot too, as doing a lot of bug testing atm.  
     
     """
     df = bounding.to_dataframe() # Turns into dataframe
@@ -119,16 +119,28 @@ def cols_px(bounding, cfgtable = cfg['Table']):
     except: 
         log.error(df)
         log.error(bounding)
-    namedf = pd.DataFrame(columns=['ColNum', 'x_avg'])
-    for x,i in enumerate(cfgtable['columns']):
-        for _ in df['text']:
-            if bool(re.search(str(cfgtable['columns'][i]['regex']), _.lower())): 
+    #for u in df: 
+    namedf = pd.DataFrame(columns = ['ColNum', 'x_avg', 'texts'])
+    for _ in df['text']:
+        for x,i in enumerate(cfgtable['columns']): # Iterates over every word and every column in config.yml
+            if bool(re.search(str(cfgtable['columns'][i]['regex']), _.lower())):
                 df1 = df[df['text'] == _].copy()
+                avg_val = df1['x_avg'].values[0] 
                 df1['ColNum'] = x
-                namedf = pd.concat([namedf, df1 ])
-                log.info('Appended column {}'.format(x))
-       # re.search([i]['regex'])
-    return namedf.reset_index(drop=True)
+                title_search_dist = cfgtable['columns'][i]['title_search_dist'] # Searches in x distance on either side of identified column, setting in config.yml
+                selected = df[abs(df['x_avg'] - avg_val) < title_search_dist].copy() # Creates df with all of the ones identified with above command 
+                selected['ColNum'] = x
+                texts = 'failed' # Texts for log
+                if x not in namedf['ColNum'].values: # If the column number is not already added to the dataframe from previous runs of loop, add it
+                    gb = selected.groupby('ColNum', as_index=False).mean() # Group by column number, average x_avg
+                    texts = selected['text'].values
+                    gb['text'] = str(texts) # Sets text column to the text of the selected column
+                    namedf = pd.concat([namedf, gb])
+                log.info('Appended column {}, identified by {} with {} distance one each side'.format(x, texts, title_search_dist))
+
+    namedf = namedf[['ColNum', 'x_avg']].sort_values(by='ColNum').reset_index(drop=True)
+    print(namedf)
+    return namedf
 
 def column_poly(table_text_poly, cols_px_df, gcv_word, cfgtable = cfg['Table']):
     """
@@ -388,7 +400,8 @@ def multirun(start, end, overwrite=False):
             pass    
     log.error(failed)
     log.info(suceeded)
-#if __name__ == '__main__':
+if __name__ == '__main__':
+    a = parse_page(785, overwrite=True)
   # pagenum = 88
   # file = "{}/{}".format(cfg["INPUT_DIRECTORY"], cfg["SOURCE_PDF"])
   # image = convert_PDF(file,pagenum)
@@ -421,8 +434,6 @@ def multirun(start, end, overwrite=False):
 #   lp.draw_box(image, a, box_width=4).save("Tests/21.png", "PNG")
 
 
-# Find a way to filter out or exclude the row titles from ending up in the df 
-# find a way to filter in regex by more than one string. 
-# Idea to do this: Assign it so you cant have repeats, essentially. Or alternative, group titles together.
 # Change the method of finding nearest to use the average position not just y_1
+# Find a better way of separating titles from rest of table thats not just based on hardcoded padding parameters. 
 
