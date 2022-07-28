@@ -160,3 +160,7 @@ test.py
 Tests/*
 Input/*
 .vscode/launch.json
+.vscode
+.ipynb_checkpoints
+.spyproject
+*.ipynb
