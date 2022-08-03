@@ -2,6 +2,16 @@
 
 This page (and project) are still under development. Paused for summer 2022, work should continue in fall 2022.  
 
+TODO: 
+
++ Change data processing functions to be more adaptable to errors
+	- needs more ridgid way of keeping track of columns/rows
++ Migrate over to SQL
+	- Temporary use of CSVs needs to be phased out. 
+	- Shouldn't be too difficult
+	- Can create private/foreign keys to associate tables with titles 
++ Impliment title fetching algorithm and associate titles with their associated tables. 
+
 File Structure : 
 
 + MunicipalFinanceOCR
